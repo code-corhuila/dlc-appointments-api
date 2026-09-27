@@ -13,7 +13,7 @@ COPY appointments-core appointments-core
 COPY appointments-adapters appointments-adapters
 COPY appointments-app appointments-app
 
-RUN mvn -B clean package -DskipTests
+RUN mvn -B clean verify
 
 FROM eclipse-temurin:21-jre
 

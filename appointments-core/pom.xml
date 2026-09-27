@@ -28,4 +28,64 @@
 
     </dependencies>
 
+    <build>
+        <plugins>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+
+                <executions>
+                    <execution>
+                        <id>enforce-core-boundary</id>
+                        <phase>validate</phase>
+
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+
+                        <configuration>
+                            <rules>
+
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+
+                                    <excludes>
+                                        <exclude>org.springframework:*</exclude>
+                                        <exclude>org.springframework.boot:*</exclude>
+                                        <exclude>org.springframework.data:*</exclude>
+                                        <exclude>org.springframework.security:*</exclude>
+                                        <exclude>org.springframework.amqp:*</exclude>
+                                        <exclude>org.springframework.integration:*</exclude>
+
+                                        <exclude>jakarta.persistence:*</exclude>
+
+                                        <exclude>org.hibernate:*</exclude>
+                                        <exclude>org.hibernate.orm:*</exclude>
+
+                                        <exclude>org.postgresql:postgresql</exclude>
+
+                                        <exclude>com.rabbitmq:amqp-client</exclude>
+                                    </excludes>
+
+                                    <message>
+                                        appointments-core must remain independent from Spring,
+                                        JPA, persistence, messaging, and infrastructure frameworks.
+                                    </message>
+                                </bannedDependencies>
+
+                            </rules>
+
+                            <fail>true</fail>
+                        </configuration>
+
+                    </execution>
+                </executions>
+
+            </plugin>
+
+        </plugins>
+    </build>
+
 </project>
