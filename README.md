@@ -1,25 +1,84 @@
 # dlc-appointments-api
 
-> appointments bounded context: service API
+> Appointments bounded context — backend service API.
 
-Part of the **LMS Library** distributed system — team `lms-library`, Grupo 2.
-Governance and documentation live in [`library-docs`](https://github.com/code-corhuila/library-docs).
+Backend service for appointment management in the **Di Lucca Dental Care & Technology** distributed system.
+
+Project governance, architecture, requirements, contracts, and technical documentation are maintained in [`code-corhuila/dlc-docs`](https://github.com/code-corhuila/dlc-docs).
+
+## Technology stack
+
+- Java 21
+- Spring Boot 3.5
+- Maven
+- PostgreSQL
+- RabbitMQ
+- Docker
+
+## Architecture
+
+The service follows Hexagonal Architecture and is divided into three Maven modules:
+
+- `appointments-core`: domain, ports, and use cases.
+- `appointments-adapters`: HTTP and infrastructure adapters.
+- `appointments-app`: Spring Boot entry point and composition root.
+
+`appointments-core` must not depend on Spring, JPA, or infrastructure frameworks.
+
+## Build
+
+From the repository root:
+
+```bash
+mvn clean verify
+```
+
+## Run locally
+
+```bash
+java -jar appointments-app/target/appointments-app-0.1.0-SNAPSHOT.jar
+```
+
+The default port is `8080`.
+
+## Health endpoints
+
+```text
+GET /health
+GET /health/ready
+```
+
+Example:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/health/ready
+```
+
+## Environment configuration
+
+Use `.env.example` as the reference for local configuration.
+
+Never commit real passwords, tokens, private keys, certificates, or `.env` files.
+
+## Database ownership
+
+Database schema migrations do not belong in this repository.
+
+The authoritative Appointments schema is managed by the dedicated database repository.
 
 ## Branching
 
-Three permanent branches. **None of them accepts a direct commit** — you enter through a child
-branch and leave through a Pull Request.
+Permanent branches do not accept direct commits.
 
-```
+```text
 develop  <--PR--  feat/... fix/... chore/...
 qa       <--PR--  qa/...
-main     <--PR--  release/...  hotfix/...
+main     <--PR--  release/... hotfix/...
 ```
 
-Promotion happens **by re-application** (`git cherry-pick -x`), never by merging one permanent
-branch into another: `merge develop -> qa` and `merge qa -> main` do not exist in this model.
+Promotion between environments uses re-application with `git cherry-pick -x`.
 
-`main` requires **1 approval from `ariel5253`**. On `develop` and `qa` the team sets its own review
-rule.
+Permanent branches are never merged directly into each other.
 
-Full policy: `00-governance/branching-policy.md` in `library-docs`.
+For the complete policy, see `00-governance/branching-policy.md` in `dlc-docs`.
