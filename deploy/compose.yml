@@ -37,6 +37,13 @@ services:
     volumes:
       - appointments_rabbitmq_data:/var/lib/rabbitmq
 
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   appointments_postgres_data:
   appointments_rabbitmq_data:
