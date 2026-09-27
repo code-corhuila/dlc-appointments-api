@@ -6,7 +6,6 @@ on:
       - develop
       - qa
       - main
-
   workflow_dispatch:
 
 permissions:
@@ -21,6 +20,29 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate promotion trace
+        if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'qa' || github.base_ref == 'main') }}
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          RANGE="${BASE_SHA}..${HEAD_SHA}"
+
+          if [ -n "$(git rev-list --merges "$RANGE")" ]; then
+            echo "::error::Merge commits are not allowed in promotion PRs."
+            exit 1
+          fi
+
+          for commit in $(git rev-list "$RANGE"); do
+            if ! git log -1 --pretty=%B "$commit" | grep -Eq '\(cherry picked from commit [0-9a-f]{7,40}\)'; then
+              echo "::error::Commit $commit lacks the cherry-pick -x trace."
+              exit 1
+            fi
+          done
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -31,3 +53,6 @@ jobs:
 
       - name: Verify project
         run: mvn -B verify
+
+      - name: Build Docker image
+        run: docker build -f deploy/Dockerfile -t dlc-appointments-api:ci .
