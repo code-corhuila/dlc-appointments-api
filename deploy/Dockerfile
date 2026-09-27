@@ -19,9 +19,19 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
+RUN groupadd --system appointments \
+    && useradd --system \
+        --gid appointments \
+        --home-dir /app \
+        --no-create-home \
+        appointments
+
 COPY --from=build \
+    --chown=appointments:appointments \
     /workspace/appointments-app/target/appointments-app-0.1.0-SNAPSHOT.jar \
     app.jar
+
+USER appointments
 
 EXPOSE 8080
 
