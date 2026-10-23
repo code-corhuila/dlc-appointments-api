@@ -19,8 +19,16 @@ public interface AppointmentRegistration {
      */
     Optional<SchedulingResult> recover(SchedulingContext context, Appointment proposed);
 
-    /** Returns the authoritative original result. Future transaction must resolve the key again
-     * before rejecting availability; an earlier empty lookup cannot establish concurrency safety.
+    /** Resolves the key first: a compatible confirmed operation returns its original result;
+     * an incompatible intention throws SchedulingException(IDEMPOTENCY_CONFLICT), without validation.
+     * Only a new operation invokes validateNewOperation, synchronously and at most once per
+     * coordination attempt, before recording success. Validation failure prevents successful
+     * registration; all exceptions propagate, including dependency failures.
+     * Validation must not perform independent writes or publish messages.
+     * Future durable coordination must cover key uniqueness, intention comparison, availability
+     * changes, overlap exclusion and patient deactivation, with atomic appointment/result/outbox.
+     * Early absence is not a reservation. Calling the validation alone provides no atomicity,
+     * serialization or safety across processes; remote checks under locks need a later protocol.
      */
-    SchedulingResult register(SchedulingContext context, Appointment proposed);
+    SchedulingResult register(SchedulingContext context, Appointment proposed, Runnable validateNewOperation);
 }
