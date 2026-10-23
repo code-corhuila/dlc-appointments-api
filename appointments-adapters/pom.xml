@@ -20,6 +20,11 @@
     <dependencies>
 
         <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>co.edu.corhuila.dlc</groupId>
             <artifactId>appointments-core</artifactId>
             <version>${project.version}</version>
