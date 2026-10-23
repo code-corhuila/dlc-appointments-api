@@ -40,8 +40,7 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
                 command.dentistId(), command.startAt(), command.endAt(), command.reason());
         var recovered = registration.recover(context, proposed);
         if (recovered.isPresent()) return recovered.get();
-        validateNewAppointment(proposed);
-        return registration.register(context, proposed);
+        return registration.register(context, proposed, () -> validateNewAppointment(proposed));
     }
 
     private void validateNewAppointment(Appointment proposed) {

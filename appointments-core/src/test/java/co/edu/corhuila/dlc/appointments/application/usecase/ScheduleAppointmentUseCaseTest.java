@@ -43,6 +43,66 @@ class ScheduleAppointmentUseCaseTest {
         assertEquals(3, ports.checks);
         assertEquals(1, ports.authorizations);
         assertEquals(1, ports.recoveries);
+        assertEquals(1, ports.coordinations);
+        assertEquals(1, ports.validations);
+    }
+
+    @Test
+    void definitiveRecoveryAfterEarlyAbsenceSkipsNewOperationValidation() {
+        ports.definitiveResult = originalResult();
+        assertDefinitiveRecovery();
+    }
+
+    @Test
+    void definitiveRecoveryPreservesOriginalResultWhenSlotIsNowOccupied() {
+        ports.definitiveResult = originalResult();
+        ports.available = false;
+        assertDefinitiveRecovery();
+    }
+
+    @Test
+    void definitiveRecoveryPreservesOriginalResultWhenEligibilityChanged() {
+        ports.definitiveResult = originalResult();
+        ports.patientActive = false;
+        ports.dentistAuthorized = false;
+        assertDefinitiveRecovery();
+    }
+
+    @Test
+    void definitiveIdempotencyConflictSkipsNewOperationValidation() {
+        ports.failure = new SchedulingException(IDEMPOTENCY_CONFLICT);
+        ports.failRegistration = true;
+        assertSame(ports.failure, assertThrows(SchedulingException.class, () -> schedule(command)));
+        assertEquals(1, ports.coordinations);
+        assertEquals(0, ports.validations);
+        assertEquals(0, ports.checks);
+        assertNull(ports.registered);
+    }
+
+    @Test
+    void registrationFailureAfterValidationDoesNotReturnPartialResult() {
+        ports.failure = new SchedulingException(DEPENDENCY_UNAVAILABLE);
+        ports.failAfterValidation = true;
+        assertSame(ports.failure, assertThrows(SchedulingException.class, () -> schedule(command)));
+        assertEquals(1, ports.validations);
+        assertEquals(3, ports.checks);
+        assertNull(ports.registered);
+    }
+
+    private SchedulingResult originalResult() {
+        return new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
+                command.dentistId(), start, command.endAt(), command.reason()), 7);
+    }
+
+    private void assertDefinitiveRecovery() {
+        assertSame(ports.definitiveResult, useCase.schedule(command, context));
+        assertEquals(1, ports.authorizations);
+        assertEquals(1, ports.recoveries);
+        assertEquals(1, ports.coordinations);
+        assertEquals(0, ports.checks);
+        assertEquals(0, ports.validations);
+        assertEquals(0, ports.registrations);
+        assertNull(ports.registered);
     }
 
     @Test
@@ -80,14 +140,14 @@ class ScheduleAppointmentUseCaseTest {
             assertEquals(0, ports.recoveries);
             assertEquals(0, ports.checks);
             assertEquals(0, ports.registrations);
+            assertEquals(0, ports.coordinations);
         }
         assertEquals(2, ports.authorizations);
     }
 
     @Test
     void recoversOriginalResultAndVersionBeforeEligibilityOrAvailabilityOnEveryAttempt() {
-        ports.recovered = new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), start, command.endAt(), command.reason()), 7);
+        ports.recovered = originalResult();
         ports.available = false;
         ports.patientActive = false;
         for (int attempt = 0; attempt < 2; attempt++) {
@@ -200,11 +260,15 @@ class ScheduleAppointmentUseCaseTest {
             AppointmentRegistration, SchedulingAuthorization {
         boolean patientActive = true, dentistAuthorized = true, available = true;
         boolean failRegistration;
+        boolean failAfterValidation;
         int checks, registrations, failAt;
         SchedulingException failure;
         Appointment registered;
         SchedulingResult result;
         int authorizations, recoveries;
+        int coordinations, validations;
+        boolean coordinating;
+        SchedulingResult definitiveResult;
         SchedulingException authorizationFailure, recoveryFailure;
         SchedulingResult recovered;
 
@@ -229,6 +293,7 @@ class ScheduleAppointmentUseCaseTest {
         }
 
         private void check() {
+            assertTrue(coordinating, "New-operation checks must run inside registration coordination.");
             assertEquals(authorizations, recoveries);
             assertTrue(recoveries > 0);
             if (++checks == failAt) throw failure;
@@ -254,10 +319,24 @@ class ScheduleAppointmentUseCaseTest {
             return available;
         }
 
-        public SchedulingResult register(SchedulingContext operation, Appointment appointment) {
+        public SchedulingResult register(SchedulingContext operation, Appointment appointment,
+                Runnable validateNewOperation) {
             assertSame(context, operation);
+            coordinations++;
+            if (definitiveResult != null) return definitiveResult;
+            if (failRegistration) {
+                registrations++;
+                throw failure;
+            }
+            coordinating = true;
+            try {
+                validations++;
+                validateNewOperation.run();
+            } finally {
+                coordinating = false;
+            }
             registrations++;
-            if (failRegistration) throw failure;
+            if (failAfterValidation) throw failure;
             registered = appointment;
             return result == null ? new SchedulingResult(appointment, 1) : result;
         }
