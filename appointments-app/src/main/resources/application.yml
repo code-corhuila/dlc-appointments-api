@@ -39,6 +39,11 @@ appointments:
     jwt-public-key-file: ${JWT_PUBLIC_KEY_FILE:}
     jwt-issuer: ${JWT_ISSUER:}
     jwt-audience: ${JWT_AUDIENCE:}
+  internal:
+    jwt-public-key: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY:}
+    jwt-public-key-file: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY_FILE:}
+    jwt-issuer: ${INTERNAL_SERVICE_JWT_ISSUER:}
+    jwt-audience: ${INTERNAL_SERVICE_JWT_AUDIENCE:}
   auth:
     internal-url: ${AUTH_INTERNAL_URL:}
     service-token: ${AUTH_SERVICE_TOKEN:}

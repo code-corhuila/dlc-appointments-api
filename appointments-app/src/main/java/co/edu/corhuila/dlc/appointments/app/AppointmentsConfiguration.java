@@ -8,6 +8,8 @@ import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.RsaPublicKeys;
+import co.edu.corhuila.dlc.appointments.adapter.in.http.security.ServiceAuthenticationFilter;
+import co.edu.corhuila.dlc.appointments.adapter.in.http.security.ServiceJwtVerifier;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthenticationFilter;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthenticationVerifier;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffJwtSignatureVerifier;
@@ -68,6 +70,17 @@ public class AppointmentsConfiguration {
                 security.jwtIssuer(), security.jwtAudience());
         var registration = new FilterRegistrationBean<>(new StaffAuthenticationFilter(
                 new StaffAuthenticationVerifier(jwt, authSessions(properties.auth()))));
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
+        return registration;
+    }
+
+    /** /internal/v1 only: service JWTs with this service's audience; scopes are checked per operation. */
+    @Bean
+    FilterRegistrationBean<ServiceAuthenticationFilter> serviceAuthenticationFilter(AppointmentsProperties properties) {
+        var internal = properties.internal();
+        var registration = new FilterRegistrationBean<>(new ServiceAuthenticationFilter(new ServiceJwtVerifier(
+                RsaPublicKeys.fromConfiguration(internal.jwtPublicKey(), internal.jwtPublicKeyFile()),
+                internal.jwtIssuer(), internal.jwtAudience(), Clock.systemUTC())));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
     }

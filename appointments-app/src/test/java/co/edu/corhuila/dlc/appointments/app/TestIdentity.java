@@ -30,6 +30,9 @@ final class TestIdentity {
     static final String DENTIST_PREFIX = "d0000000-";
     private static final RSAKey KEY = generate();
     private static final RSAKey OTHER_KEY = generate();
+    static final String SERVICE_ISSUER = "https://services.test.local";
+    static final String SERVICE_AUDIENCE = "dlc-appointments-test";
+    private static final RSAKey SERVICE_KEY = generate();
     private static final HttpServer AUTH = fakeAuth();
 
     private TestIdentity() { }
@@ -40,6 +43,11 @@ final class TestIdentity {
         registry.add("appointments.security.jwt-public-key", () -> pem.replace("\n", "\\n"));
         registry.add("appointments.security.jwt-issuer", () -> ISSUER);
         registry.add("appointments.security.jwt-audience", () -> AUDIENCE);
+        String service = Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(encoded(SERVICE_KEY));
+        registry.add("appointments.internal.jwt-public-key", () -> ("-----BEGIN PUBLIC KEY-----\n" + service
+                + "\n-----END PUBLIC KEY-----").replace("\n", "\\n"));
+        registry.add("appointments.internal.jwt-issuer", () -> SERVICE_ISSUER);
+        registry.add("appointments.internal.jwt-audience", () -> SERVICE_AUDIENCE);
         registry.add("appointments.auth.internal-url",
                 () -> "http://localhost:" + AUTH.getAddress().getPort());
         registry.add("appointments.auth.service-token", () -> "synthetic-service-token");
@@ -52,6 +60,14 @@ final class TestIdentity {
 
     static String bearer(String staffId, String... roles) {
         return "Bearer " + rs256(claims(staffId, Instant.now().plusSeconds(600), roles), KEY);
+    }
+
+    /** A short-lived service JWT for /internal/v1 with the given space-separated scopes. */
+    static String service(String subject, String... scopes) {
+        Instant now = Instant.now();
+        return "Bearer " + rs256(new JWTClaimsSet.Builder().issuer(SERVICE_ISSUER).audience(SERVICE_AUDIENCE)
+                .subject(subject).issueTime(Date.from(now.minusSeconds(5))).expirationTime(Date.from(now.plusSeconds(300)))
+                .claim("scope", String.join(" ", scopes)).build(), SERVICE_KEY);
     }
 
     static String expired(String staffId) {
@@ -99,8 +115,12 @@ final class TestIdentity {
     }
 
     private static byte[] publicKey() {
+        return encoded(KEY);
+    }
+
+    private static byte[] encoded(RSAKey key) {
         try {
-            return KEY.toRSAPublicKey().getEncoded();
+            return key.toRSAPublicKey().getEncoded();
         } catch (Exception failure) {
             throw new IllegalStateException(failure);
         }
