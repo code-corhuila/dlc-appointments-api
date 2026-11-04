@@ -39,7 +39,7 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
     @Override
     public SchedulingResult schedule(ScheduleAppointmentCommand command, SchedulingContext context) {
         Objects.requireNonNull(context, "context");
-        authorization.requireSchedulingAllowed(context.actorUserId(), context.sessionId());
+        authorization.requireSchedulingAllowed(context);
         Objects.requireNonNull(command, "command");
         Appointment proposed = Appointment.schedule(ids.newId(), command.patientId(),
                 command.dentistId(), command.startAt(), command.endAt(), command.reason(),
