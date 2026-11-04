@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -9,7 +10,7 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/** MVC errors only; security filters, missing routes and /error need separate verification. */
+/** MVC errors, including missing routes and unsupported methods; filters write their own envelope. */
 @RestControllerAdvice
 public class HttpExceptionHandler extends ResponseEntityExceptionHandler {
     /** Server-side instrumentation may set this only after verifying its trace source.
@@ -25,12 +26,15 @@ public class HttpExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
-        if (status.value() == 400) {
-            var mapped = HttpErrorMapper.invalidRequest(trustedTrace(request));
-            return new ResponseEntity<>(mapped.getBody(), headers, status);
-        }
         // Preserve Spring MVC's recognized statuses rather than classifying them as unexpected failures.
-        return super.handleExceptionInternal(ex, body, headers, status, request);
+        return HttpErrorMapper.forFrameworkStatus(status.value(), trustedTrace(request))
+                .<ResponseEntity<Object>>map(envelope -> {
+                    HttpHeaders json = new HttpHeaders();
+                    if (headers != null) json.putAll(headers);
+                    json.setContentType(MediaType.APPLICATION_JSON);
+                    return new ResponseEntity<>(envelope, json, status);
+                })
+                .orElseGet(() -> super.handleExceptionInternal(ex, body, headers, status, request));
     }
 
     private String trustedTrace(WebRequest request) {
