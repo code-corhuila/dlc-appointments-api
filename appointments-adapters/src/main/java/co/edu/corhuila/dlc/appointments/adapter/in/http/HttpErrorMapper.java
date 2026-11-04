@@ -4,6 +4,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
@@ -33,6 +34,21 @@ public final class HttpErrorMapper {
 
     public static ResponseEntity<ApiError> invalidRequest(String trustedTraceId) {
         return response(400, "VALIDATION_ERROR", "The request is invalid.", null, trustedTraceId);
+    }
+
+    /** Envelope for statuses Spring MVC raises before any controller runs; empty when not covered. */
+    public static Optional<ApiError> forFrameworkStatus(int status, String trustedTraceId) {
+        return Optional.ofNullable(switch (status) {
+            case 400 -> invalidRequest(trustedTraceId).getBody();
+            case 404 -> new ApiError("NOT_FOUND", "The resource or route does not exist.", null, trustedTraceId);
+            case 405 -> new ApiError("METHOD_NOT_ALLOWED", "The method is not allowed for this route.", null,
+                    trustedTraceId);
+            case 406 -> new ApiError("NOT_ACCEPTABLE", "The requested representation is not available.", null,
+                    trustedTraceId);
+            case 415 -> new ApiError("UNSUPPORTED_MEDIA_TYPE", "The content type is not supported.", null,
+                    trustedTraceId);
+            default -> null;
+        });
     }
 
     private static ResponseEntity<ApiError> response(int status, String code, String message,
