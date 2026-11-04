@@ -43,6 +43,17 @@ class RuntimeLimitsTest {
         assertThat(lifecycle.getTimeoutPerShutdownPhase()).isEqualTo(Duration.ofSeconds(20));
     }
 
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
+    @Test
+    void connectionPoolAndStatementLimitsAreDeclared() {
+        var pool = (com.zaxxer.hikari.HikariDataSource) dataSource;
+        assertThat(pool.getMaximumPoolSize()).isEqualTo(10);
+        assertThat(pool.getConnectionTimeout()).isEqualTo(Duration.ofSeconds(5).toMillis());
+        assertThat(pool.getConnectionInitSql()).isEqualTo("SET statement_timeout = '5s'");
+    }
+
     @Test
     void outboundAuthCallsHaveAnExplicitDeadline() {
         assertThat(appointments.auth().timeout()).isEqualTo(Duration.ofSeconds(2));
