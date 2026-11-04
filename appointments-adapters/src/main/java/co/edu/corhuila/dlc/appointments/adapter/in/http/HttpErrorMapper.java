@@ -7,6 +7,7 @@ import co.edu.corhuila.dlc.appointments.domain.model.ClinicalAssignmentNotFoundE
 import co.edu.corhuila.dlc.appointments.domain.model.DentistNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAvailabilityException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidStatusTransitionException;
+import co.edu.corhuila.dlc.appointments.domain.model.ReminderOutcomeConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.StaleVersionException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
@@ -36,6 +37,13 @@ public final class HttpErrorMapper {
         if (failure instanceof StaleVersionException) {
             return response(409, "STALE_VERSION", "The resource has changed. Reload it before submitting again.",
                     null, trustedTraceId);
+        }
+        if (failure instanceof ReminderOutcomeConflictException outcome) {
+            return outcome.reason() == ReminderOutcomeConflictException.Reason.STALE
+                    ? response(409, "STALE_VERSION", "The delivery is not current for this appointment.", null,
+                            trustedTraceId)
+                    : response(409, "IDEMPOTENCY_CONFLICT", "A different outcome was already recorded.", null,
+                            trustedTraceId);
         }
         if (failure instanceof InvalidStatusTransitionException) {
             return response(422, "INVALID_STATUS_TRANSITION", "The current state does not allow this transition.",
