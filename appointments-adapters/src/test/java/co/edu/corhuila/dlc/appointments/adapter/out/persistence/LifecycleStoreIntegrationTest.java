@@ -172,6 +172,24 @@ class LifecycleStoreIntegrationTest {
         assertEquals(false, event.get("has_override"));
     }
 
+    /** D10: a delivered reminder is invalidated with its history and the new date gets its own reminder. */
+    @Test
+    void reschedulingAfterADeliveredReminderStillRemindsTheNewDate() {
+        Appointment a = scheduled();
+        jdbc.sql("UPDATE appointments.appointment_reminders SET status = 'SENT', delivery_id = ?, outcome_at = ? "
+                + "WHERE appointment_id = ?").params(UUID.randomUUID(), java.sql.Timestamp.from(NOW), a.id()).update();
+        var context = context("ADMINISTRATOR");
+        OffsetDateTime next = a.startAt().plusDays(500);
+        store.apply(new LifecycleCommand.Reschedule(a.id(), 1, next, next.plusMinutes(30), "Override", true), context,
+                current -> Optional.of(current.reschedule(next, next.plusMinutes(30), "Override", true,
+                        StaffRole.ADMINISTRATOR, context.actorUserId(), NOW)));
+
+        assertEquals("1 INVALIDATED true|2 PENDING false", jdbc.sql("SELECT string_agg(appointment_version || ' ' "
+                + "|| status || ' ' || (outcome_at IS NOT NULL), '|' ORDER BY appointment_version) "
+                + "FROM appointments.appointment_reminders WHERE appointment_id = ?").param(a.id())
+                .query(String.class).single());
+    }
+
     @Test
     void anUnknownAppointmentIsNotFound() {
         assertThrows(AppointmentNotFoundException.class, () -> store.apply(new LifecycleCommand.StartAttention(
