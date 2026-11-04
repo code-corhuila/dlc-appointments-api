@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Externalized configuration bound from the environment variables listed in .env.example. */
 @ConfigurationProperties(prefix = "appointments")
-public record AppointmentsProperties(Security security, Auth auth) {
+public record AppointmentsProperties(String clinicTimezone, Security security, Auth auth) {
 
     /** Trusted Auth public key (inline PEM or file), issuer and audience of staff access tokens. */
     public record Security(String jwtPublicKey, String jwtPublicKeyFile, String jwtIssuer, String jwtAudience) { }

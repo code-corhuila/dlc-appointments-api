@@ -41,6 +41,8 @@ final class TestIdentity {
         registry.add("appointments.auth.internal-url",
                 () -> "http://localhost:" + AUTH.getAddress().getPort());
         registry.add("appointments.auth.service-token", () -> "synthetic-service-token");
+        // Unreachable on purpose: HTTP tests that need the database configure a real one.
+        registry.add("spring.datasource.url", () -> "jdbc:postgresql://localhost:1/unreachable");
     }
 
     static String bearer(String staffId, String... roles) {

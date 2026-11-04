@@ -4,6 +4,16 @@ spring:
   lifecycle:
     # Norma 5.3.10: graceful shutdown limit.
     timeout-per-shutdown-phase: 20s
+  datasource:
+    # Own schema only, as appointments_runtime; the API never runs migrations.
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # Norma 5.3.10: pool size, connection wait and per-statement limit.
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      connection-init-sql: "SET statement_timeout = '5s'"
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -22,6 +32,8 @@ server:
     keep-alive-timeout: 60s
 
 appointments:
+  # Single clinic (HU-APT-001): instants are stored in UTC and interpreted in this zone.
+  clinic-timezone: America/Bogota
   security:
     jwt-public-key: ${JWT_PUBLIC_KEY:}
     jwt-public-key-file: ${JWT_PUBLIC_KEY_FILE:}
