@@ -39,6 +39,11 @@ appointments:
     jwt-public-key-file: ${JWT_PUBLIC_KEY_FILE:}
     jwt-issuer: ${JWT_ISSUER:}
     jwt-audience: ${JWT_AUDIENCE:}
+  # APT-006 informational reminders: bounded passes at a fixed delay.
+  reminders:
+    enabled: ${APPOINTMENTS_REMINDERS_ENABLED:true}
+    interval: ${APPOINTMENTS_REMINDERS_INTERVAL:PT30S}
+    batch-size: ${APPOINTMENTS_REMINDERS_BATCH_SIZE:100}
   internal:
     jwt-public-key: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY:}
     jwt-public-key-file: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY_FILE:}
