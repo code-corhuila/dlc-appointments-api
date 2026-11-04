@@ -72,6 +72,7 @@ public final class JdbcClinicalAssignmentStore implements ClinicalAssignmentStor
     public AssignmentResult start(SchedulingContext context, ClinicalAssignment proposed) {
         try {
             return transactions.execute(status -> recover(context, proposed).orElseGet(() -> {
+                new JdbcPatientGates(jdbc).requireOpen(proposed.patientId());
                 insert(proposed);
                 event("ClinicalAssignmentStarted", proposed, proposed.startedAt(), proposed.startedBy(), context);
                 keys.save(new IdempotencyRecord(context.actorUserId(), START, context.idempotencyKey(),
