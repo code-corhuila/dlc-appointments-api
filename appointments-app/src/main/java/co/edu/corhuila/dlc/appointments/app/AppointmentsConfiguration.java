@@ -16,7 +16,13 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcDentistAvailabilityStore;
 import co.edu.corhuila.dlc.appointments.application.port.in.ListAppointments;
+import co.edu.corhuila.dlc.appointments.application.port.in.ReadDentistAvailability;
+import co.edu.corhuila.dlc.appointments.application.port.in.ReplaceDentistAvailability;
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
+import co.edu.corhuila.dlc.appointments.application.usecase.ReadDentistAvailabilityUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvailabilityUseCase;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
@@ -87,16 +93,39 @@ public class AppointmentsConfiguration {
         return () -> Integer.valueOf(1).equals(jdbc.sql("SELECT 1").query(Integer.class).single());
     }
 
-    /** HU-APT-001: Secretary/Assistant or Administrator schedules after owner eligibility checks. */
+    /** APT-001 owner checks: Patients for active patients, Auth for active Dentists. */
     @Bean
-    ScheduleAppointment scheduleAppointment(AppointmentsProperties properties, JdbcClient jdbc,
-            TransactionTemplate transactions, JdbcAppointmentRepository appointments, JdbcIdempotencyStore keys,
-            JdbcOutboxWriter outbox) {
+    AppointmentEligibility appointmentEligibility(AppointmentsProperties properties) {
         var auth = properties.auth();
         var patients = properties.patients();
-        var eligibility = new HttpAppointmentEligibility(ownerClient(auth.timeout()),
+        return new HttpAppointmentEligibility(ownerClient(auth.timeout()),
                 required(patients.internalUrl(), "PATIENTS_INTERNAL_URL"), patients::currentServiceToken,
                 auth.internalUrl(), auth::currentServiceToken);
+    }
+
+    @Bean
+    JdbcDentistAvailabilityStore availabilityStore(TransactionTemplate transactions, JdbcClient jdbc) {
+        return new JdbcDentistAvailabilityStore(transactions, jdbc, UUID::randomUUID);
+    }
+
+    /** HU-APT-001 availability, contract 1.4.0: schedulers replace it; a Dentist reads only their own. */
+    @Bean
+    ReplaceDentistAvailability replaceDentistAvailability(JdbcDentistAvailabilityStore store,
+            AppointmentEligibility eligibility) {
+        return new ReplaceDentistAvailabilityUseCase(store, eligibility, UUID::randomUUID, Clock.systemUTC());
+    }
+
+    @Bean
+    ReadDentistAvailability readDentistAvailability(JdbcDentistAvailabilityStore store,
+            AppointmentEligibility eligibility) {
+        return new ReadDentistAvailabilityUseCase(store, eligibility);
+    }
+
+    /** HU-APT-001: Secretary/Assistant or Administrator schedules after owner eligibility checks. */
+    @Bean
+    ScheduleAppointment scheduleAppointment(AppointmentEligibility eligibility, JdbcClient jdbc,
+            TransactionTemplate transactions, JdbcAppointmentRepository appointments, JdbcIdempotencyStore keys,
+            JdbcOutboxWriter outbox) {
         return new ScheduleAppointmentUseCase(eligibility, new JdbcAppointmentAvailability(jdbc),
                 new JdbcAppointmentRegistration(transactions, jdbc, appointments, keys, outbox, UUID::randomUUID),
                 new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC());

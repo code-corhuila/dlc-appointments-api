@@ -21,9 +21,12 @@ public final class JdbcAppointmentAvailability implements AppointmentAvailabilit
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
     }
 
+    /** Inside the registration transaction, FOR SHARE holds off a concurrent availability replacement. */
     @Override
     public boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt) {
         try {
+            jdbc.sql("SELECT schedule_id FROM appointments.dentist_schedules WHERE dentist_id = ? FOR SHARE")
+                    .param(dentistId).query(UUID.class).optional();
             return jdbc.sql("""
                     SELECT EXISTS (
                         SELECT 1 FROM appointments.dentist_schedules s
