@@ -103,6 +103,40 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
         return new AppointmentPage(items, criteria.page(), criteria.limit(), total);
     }
 
+    /** Locks the row for the rest of the caller's transaction (HU-APT-002 lifecycle changes). */
+    public Optional<Appointment> findForUpdate(UUID id) {
+        return jdbc.sql("""
+                SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,
+                       reminder_status, version, created_at, created_by, updated_at, updated_by
+                FROM appointments.appointments WHERE appointment_id = ? FOR UPDATE""")
+                .param(id)
+                .query((row, n) -> Appointment.reconstitute(snapshot(row)))
+                .optional();
+    }
+
+    /** Writes the next version over the expected one; the GiST exclusion still guards a moved interval. */
+    public void update(Appointment next, long expectedVersion) {
+        AppointmentSnapshot a = next.snapshot();
+        try {
+            int updated = jdbc.sql("""
+                    UPDATE appointments.appointments SET start_at = ?, end_at = ?, status = ?, confirmation_status = ?,
+                        reminder_due_at = ?, reminder_status = ?, version = ?, updated_at = ?, updated_by = ?
+                    WHERE appointment_id = ? AND version = ?""")
+                    .params(utc(a.startAt()), utc(a.endAt()), a.status().name(), a.confirmationStatus().name(),
+                            utc(next.reminderDueAt()), a.reminderStatus().name(), a.version(),
+                            Timestamp.from(a.updatedAt()), a.updatedBy(), a.id(), expectedVersion)
+                    .update();
+            if (updated != 1) {
+                throw new IllegalStateException("The locked appointment version changed.");
+            }
+        } catch (DataIntegrityViolationException violation) {
+            if (sqlState(violation).equals(EXCLUSION_VIOLATION)) {
+                throw new SchedulingException(SchedulingException.Reason.SLOT_UNAVAILABLE);
+            }
+            throw violation;
+        }
+    }
+
     private static AppointmentSnapshot snapshot(ResultSet row) throws SQLException {
         return new AppointmentSnapshot(row.getObject("appointment_id", UUID.class),
                 row.getObject("patient_id", UUID.class), row.getObject("dentist_id", UUID.class),
