@@ -72,6 +72,68 @@ class AppointmentsHttpTest {
                 .andExpect(header().string("X-Correlation-Id", matchesPattern(UUID_PATTERN)));
     }
 
+    private static final String VALID_BODY = """
+            {"patientId":"a9900000-0000-4000-8000-0000000000e1","dentistId":"a9900000-0000-4000-8000-0000000000d1",
+             "startAt":"2031-05-01T09:00:00-05:00","endAt":"2031-05-01T09:30:00-05:00","reason":"Checkup"}""";
+
+    private org.springframework.test.web.servlet.ResultActions schedule(String body, String key, String... roles)
+            throws Exception {
+        var request = post("/api/v1/appointments").contentType("application/json").content(body)
+                .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY,
+                        roles.length == 0 ? new String[]{"SECRETARY_ASSISTANT"} : roles));
+        return mvc.perform(key == null ? request : request.header("Idempotency-Key", key));
+    }
+
+    @Test
+    void scheduleWithoutIdempotencyKeyNamesTheHeaderInDetails() throws Exception {
+        schedule(VALID_BODY, null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details[?(@.field == 'Idempotency-Key')]").exists());
+        schedule(VALID_BODY, "short")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[?(@.field == 'Idempotency-Key')]").exists());
+    }
+
+    @Test
+    void invalidBodyNamesEveryInvalidFieldTogetherWithTheMissingHeader() throws Exception {
+        schedule("{\"dentistId\":\"a9900000-0000-4000-8000-0000000000d1\",\"reason\":\"\"}", null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details[?(@.field == 'patientId')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'startAt')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'endAt')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'reason')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'Idempotency-Key')]").exists());
+    }
+
+    @Test
+    void wronglyTypedFieldIsNamedInDetails() throws Exception {
+        schedule(VALID_BODY.replace("a9900000-0000-4000-8000-0000000000e1", "not-a-uuid"), "retry-key-0001")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[0].field").value("patientId"));
+        schedule(VALID_BODY.replace("2031-05-01T09:00:00-05:00", "2031-05-01T09:00:00"), "retry-key-0001")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[0].field").value("startAt"));
+    }
+
+    @Test
+    void malformedJsonAndUnknownFieldsAreValidationErrors() throws Exception {
+        schedule("{\"patientId\":", "retry-key-0001")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        schedule(VALID_BODY.replace("\"reason\"", "\"createdBy\":\"x\",\"reason\""), "retry-key-0001")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[0].field").value("createdBy"));
+    }
+
+    @Test
+    void dentistCannotScheduleAppointments() throws Exception {
+        schedule(VALID_BODY, "retry-key-0001", "DENTIST")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+    }
+
     @Test
     void readinessReportsNotReadyWhileItsOwnDatabaseIsUnreachable() throws Exception {
         mvc.perform(get("/health/ready"))

@@ -92,33 +92,35 @@ class AppointmentDtoContractTest {
     }
 
     @Test
-    void responseExplicitlyMapsAuthoritativeAppointmentAndOriginalVersion() {
+    void responseExplicitlyMapsTheAggregateIntoTheContractRepresentationInUtc() {
         var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
-        var response = AppointmentResponse.from(new SchedulingResult(appointment, 7, true));
+        var response = AppointmentResponse.from(new SchedulingResult(appointment, 1, true));
         assertEquals(ID, response.id());
         assertEquals(PATIENT, response.patientId());
         assertEquals(DENTIST, response.dentistId());
-        assertEquals(START, response.startAt());
-        assertEquals(END, response.endAt());
+        assertEquals(START.toInstant(), response.startAt().toInstant());
+        assertEquals(java.time.ZoneOffset.UTC, response.startAt().getOffset());
+        assertEquals(END.toInstant(), response.endAt().toInstant());
         assertEquals("PROGRAMADA", response.status());
-        assertEquals(7, response.version());
+        assertEquals("PENDING", response.confirmationStatus());
+        assertEquals(1, response.version());
         assertEquals(appointment.reason(), response.reason());
-        assertEquals(appointment.reminderDueAt(), response.reminderDueAt());
+        assertEquals(appointment.reminderDueAt().toInstant(), response.reminderDueAt().toInstant());
+        assertEquals(NOW, response.createdAt());
+        assertEquals(NOW, response.updatedAt());
     }
 
     @Test
-    void responseJsonIsFlatAndContainsOnlyRequiredAndDerivableFields() throws Exception {
+    void responseJsonHasExactlyTheContractAppointmentFields() throws Exception {
         var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
-        JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(new SchedulingResult(appointment, 7, true))));
-        assertEquals(Set.of("id", "patientId", "dentistId", "startAt", "endAt", "status", "version",
-                "reason", "reminderDueAt"), fields(tree));
+        JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(appointment)));
+        assertEquals(Set.of("id", "patientId", "dentistId", "startAt", "endAt", "reason", "status",
+                "confirmationStatus", "reminderDueAt", "createdAt", "updatedAt", "version"), fields(tree));
         assertEquals(ID.toString(), tree.get("id").textValue());
-        assertEquals("PROGRAMADA", tree.get("status").textValue());
         assertTrue(tree.get("version").isIntegralNumber());
-        assertEquals(7, tree.get("version").longValue());
-        assertEquals(START, OffsetDateTime.parse(tree.get("startAt").textValue()));
-        assertEquals(END, OffsetDateTime.parse(tree.get("endAt").textValue()));
-        assertEquals(START.minusHours(24), OffsetDateTime.parse(tree.get("reminderDueAt").textValue()));
+        assertEquals("2026-11-01T14:00:00Z", tree.get("startAt").textValue());
+        assertEquals("2026-10-31T14:00:00Z", tree.get("reminderDueAt").textValue());
+        assertEquals("2026-10-01T00:00:00Z", tree.get("createdAt").textValue());
         tree.elements().forEachRemaining(value -> assertFalse(value.isNull()));
     }
 

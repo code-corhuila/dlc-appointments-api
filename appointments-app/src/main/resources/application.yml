@@ -44,6 +44,10 @@ appointments:
     service-token: ${AUTH_SERVICE_TOKEN:}
     service-token-file: ${AUTH_SERVICE_TOKEN_FILE:}
     timeout: 2s
+  patients:
+    internal-url: ${PATIENTS_INTERNAL_URL:}
+    service-token: ${PATIENTS_SERVICE_TOKEN:}
+    service-token-file: ${PATIENTS_SERVICE_TOKEN_FILE:}
 
 logging:
   structured:
