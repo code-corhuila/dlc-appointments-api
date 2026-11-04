@@ -143,6 +143,55 @@ class AppointmentsSchedulingHttpTest {
                 .andExpect(jsonPath("$.traceId").isString());
     }
 
+    @Test
+    void calendarPagesMostRecentFirstWithinFiltersAndScope() throws Exception {
+        String dentist = TestIdentity.DENTIST_PREFIX + UUID.randomUUID().toString().substring(9);
+        OffsetDateTime dayStart = openDay(dentist);
+        for (String time : new String[]{"08:00", "09:00", "10:00"}) {
+            schedule(body(TestIdentity.ACTIVE_PATIENT, dentist, dayStart, time), "key-" + UUID.randomUUID())
+                    .andExpect(status().isCreated());
+        }
+        String secretary = TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT");
+
+        String json = list("dentistId=" + dentist, secretary)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.meta.page").value(1))
+                .andExpect(jsonPath("$.meta.limit").value(20))
+                .andExpect(jsonPath("$.meta.total").value(3))
+                .andExpect(jsonPath("$.meta.totalPages").value(1))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode data = new ObjectMapper().readTree(json).get("data");
+        for (int i = 1; i < data.size(); i++) {
+            assertThat(Instant.parse(data.get(i - 1).get("createdAt").asText()))
+                    .isAfterOrEqualTo(Instant.parse(data.get(i).get("createdAt").asText()));
+        }
+        assertThat(data.get(0).get("startAt").asText()).isEqualTo(dayStart.withHour(10).toInstant().toString());
+
+        list("dentistId=" + dentist + "&limit=2&page=2", secretary)
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.meta.page").value(2))
+                .andExpect(jsonPath("$.meta.limit").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+        String from = dayStart.withHour(9).toInstant().toString();
+        String to = dayStart.withHour(10).toInstant().toString();
+        list("dentistId=" + dentist + "&from=" + from + "&to=" + to, secretary)
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].startAt").value(from));
+        list("dentistId=" + dentist + "&from=" + from + "&to=" + from, secretary)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.meta.total").value(0));
+        list("", TestIdentity.bearer(dentist, "DENTIST"))
+                .andExpect(jsonPath("$.meta.total").value(3));
+        list("dentistId=" + TestIdentity.DENTIST, TestIdentity.bearer(dentist, "DENTIST"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.meta.total").value(0))
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    private ResultActions list(String query, String bearer) throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/v1/appointments?" + query).header("Authorization", bearer));
+    }
+
     private ResultActions read(String id, String bearer) throws Exception {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                 .get("/api/v1/appointments/" + id).header("Authorization", bearer));
@@ -156,9 +205,13 @@ class AppointmentsSchedulingHttpTest {
 
     /** A fresh day with TestIdentity.DENTIST available 08:00-12:00 Bogota time and no appointments yet. */
     private OffsetDateTime openDay() {
+        return openDay(TestIdentity.DENTIST);
+    }
+
+    private OffsetDateTime openDay(String dentistId) {
         OffsetDateTime dayStart = OffsetDateTime.parse("2032-01-01T00:00:00-05:00")
                 .plusDays(day++);
-        UUID dentist = UUID.fromString(TestIdentity.DENTIST);
+        UUID dentist = UUID.fromString(dentistId);
         UUID schedule = jdbc.sql("SELECT schedule_id FROM appointments.dentist_schedules WHERE dentist_id = ?")
                 .param(dentist).query(UUID.class).optional().orElseGet(() -> {
                     UUID created = UUID.randomUUID();
@@ -174,8 +227,12 @@ class AppointmentsSchedulingHttpTest {
     }
 
     private static String body(String patient, OffsetDateTime dayStart, String time) {
+        return body(patient, TestIdentity.DENTIST, dayStart, time);
+    }
+
+    private static String body(String patient, String dentist, OffsetDateTime dayStart, String time) {
         OffsetDateTime start = dayStart.withHour(Integer.parseInt(time.substring(0, 2)));
-        return "{\"patientId\":\"" + patient + "\",\"dentistId\":\"" + TestIdentity.DENTIST + "\",\"startAt\":\""
+        return "{\"patientId\":\"" + patient + "\",\"dentistId\":\"" + dentist + "\",\"startAt\":\""
                 + start + "\",\"endAt\":\"" + start.plusMinutes(30) + "\",\"reason\":\"Checkup\"}";
     }
 }

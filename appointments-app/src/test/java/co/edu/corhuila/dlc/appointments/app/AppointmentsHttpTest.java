@@ -128,6 +128,18 @@ class AppointmentsHttpTest {
     }
 
     @Test
+    void calendarRejectsOutOfRangePagingUnknownFiltersAndBadRanges() throws Exception {
+        String bearer = TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT");
+        for (String query : new String[]{"limit=101", "limit=0", "page=0", "page=x", "status=PROGRAMADA",
+                "from=2031-01-01T00:00:00", "from=2031-01-02T00:00:00Z&to=2031-01-01T00:00:00Z", "dentistId=nope"}) {
+            mvc.perform(get("/api/v1/appointments?" + query).header("Authorization", bearer))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.details[0].field").isString());
+        }
+    }
+
+    @Test
     void malformedAppointmentIdIsAValidationError() throws Exception {
         mvc.perform(get("/api/v1/appointments/not-a-uuid")
                         .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT")))
