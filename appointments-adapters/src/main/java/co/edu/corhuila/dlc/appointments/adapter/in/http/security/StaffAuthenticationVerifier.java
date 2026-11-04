@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.jwt.BadJwtException;
  * Trusted keys, current service credentials and safe Auth transport remain caller responsibilities.
  * No token/claims cache, Spring bean, sid conversion or role evaluation is introduced.
  */
-public final class StaffAuthenticationVerifier {
+public final class StaffAuthenticationVerifier implements AccessTokenVerifier {
     private final StaffJwtSignatureVerifier jwt;
     private final AuthSessionValidationClient sessions;
 
@@ -20,6 +20,7 @@ public final class StaffAuthenticationVerifier {
     }
 
     /** Invalid JWTs fail before Auth. Dependency failures propagate without becoming inactivity. */
+    @Override
     public JWTClaimsSet verify(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
             throw new BadJwtException("A staff access token is required.");

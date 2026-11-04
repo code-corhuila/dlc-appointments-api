@@ -11,6 +11,18 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+appointments:
+  security:
+    jwt-public-key: ${JWT_PUBLIC_KEY:}
+    jwt-public-key-file: ${JWT_PUBLIC_KEY_FILE:}
+    jwt-issuer: ${JWT_ISSUER:}
+    jwt-audience: ${JWT_AUDIENCE:}
+  auth:
+    internal-url: ${AUTH_INTERNAL_URL:}
+    service-token: ${AUTH_SERVICE_TOKEN:}
+    service-token-file: ${AUTH_SERVICE_TOKEN_FILE:}
+    timeout: 2s
+
 logging:
   structured:
     format:
