@@ -24,6 +24,12 @@ public final class JdbcAppointmentAvailability implements AppointmentAvailabilit
     /** Inside the registration transaction, FOR SHARE holds off a concurrent availability replacement. */
     @Override
     public boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt) {
+        return isAvailable(dentistId, startAt, endAt, null);
+    }
+
+    /** The moving appointment's own row is ignored; the GiST exclusion still guards the UPDATE. */
+    @Override
+    public boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt, UUID movingId) {
         try {
             jdbc.sql("SELECT schedule_id FROM appointments.dentist_schedules WHERE dentist_id = ? FOR SHARE")
                     .param(dentistId).query(UUID.class).optional();
@@ -39,9 +45,11 @@ public final class JdbcAppointmentAvailability implements AppointmentAvailabilit
                                     && tstzrange(CAST(:start AS timestamptz), CAST(:end AS timestamptz), '[)'))
                           AND NOT EXISTS (SELECT 1 FROM appointments.appointments p
                               WHERE p.dentist_id = :dentist AND p.status IN ('PROGRAMADA','CONFIRMADA','EN_ATENCION')
+                                AND p.appointment_id IS DISTINCT FROM CAST(:moving AS uuid)
                                 AND tstzrange(p.start_at, p.end_at, '[)')
                                     && tstzrange(CAST(:start AS timestamptz), CAST(:end AS timestamptz), '[)')))""")
                     .param("dentist", dentistId)
+                    .param("moving", movingId)
                     .param("start", startAt.withOffsetSameInstant(ZoneOffset.UTC))
                     .param("end", endAt.withOffsetSameInstant(ZoneOffset.UTC))
                     .query(Boolean.class).single();

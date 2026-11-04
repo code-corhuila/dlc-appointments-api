@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
 import co.edu.corhuila.dlc.appointments.application.port.in.LifecycleCommand;
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentLifecycleStore;
 import co.edu.corhuila.dlc.appointments.application.port.out.SchedulingAuthorization;
@@ -46,7 +47,7 @@ class ChangeAppointmentStatusUseCaseTest {
     private final FakeStore store = new FakeStore();
     private final FakeEligibility eligibility = new FakeEligibility();
     private final ChangeAppointmentStatusUseCase useCase = new ChangeAppointmentStatusUseCase(store,
-            id -> Optional.ofNullable(store.current).filter(a -> a.id().equals(id)), eligibility,
+            id -> Optional.ofNullable(store.current).filter(a -> a.id().equals(id)), eligibility, eligibility,
             STAFF_ONLY, Clock.fixed(NOW, ZoneOffset.UTC));
 
     private static SchedulingContext as(String... roles) {
@@ -100,6 +101,7 @@ class ChangeAppointmentStatusUseCaseTest {
         store.current = in(AppointmentStatus.PROGRAMADA, 1);
         Instant late = START.toInstant().minusSeconds(3600);
         var lateUseCase = new ChangeAppointmentStatusUseCase(store, id -> Optional.of(store.current), eligibility,
+                eligibility,
                 STAFF_ONLY, Clock.fixed(late, ZoneOffset.UTC));
 
         lateUseCase.change(new LifecycleCommand.Cancel(ID, 1, "Emergency", true), as("ADMINISTRATOR",
@@ -140,10 +142,33 @@ class ChangeAppointmentStatusUseCaseTest {
     void noShowIsRecordedAfterTheEnd() {
         store.current = in(AppointmentStatus.PROGRAMADA, 1);
         var afterEnd = new ChangeAppointmentStatusUseCase(store, id -> Optional.of(store.current), eligibility,
+                eligibility,
                 STAFF_ONLY, Clock.fixed(START.plusHours(1).toInstant(), ZoneOffset.UTC));
         assertEquals(AppointmentStatus.NO_ASISTIO, afterEnd.change(new LifecycleCommand.NoShow(ID, 1, "Absent"),
                 as("ADMINISTRATOR")).status());
         assertEquals("Absent", store.lastChange.reason());
+    }
+
+    @Test
+    void reschedulingChecksThePatientAndTheNewIntervalWithoutTheAppointmentItself() {
+        store.current = in(AppointmentStatus.CONFIRMADA, 2);
+        OffsetDateTime next = START.plusDays(3);
+        var command = new LifecycleCommand.Reschedule(ID, 2, next, next.plusMinutes(30), "Agenda", false);
+
+        Appointment moved = useCase.change(command, as("SECRETARY_ASSISTANT"));
+        assertEquals(AppointmentStatus.PROGRAMADA, moved.status());
+        assertEquals(next, moved.startAt());
+        assertEquals(ID, eligibility.moving);
+
+        store.current = in(AppointmentStatus.PROGRAMADA, 2);
+        eligibility.available = false;
+        assertEquals(SchedulingException.Reason.SLOT_UNAVAILABLE, assertThrows(SchedulingException.class,
+                () -> useCase.change(command, as("SECRETARY_ASSISTANT"))).reason());
+        eligibility.active = false;
+        int calls = store.calls;
+        assertEquals(SchedulingException.Reason.PATIENT_INELIGIBLE, assertThrows(SchedulingException.class,
+                () -> useCase.change(command, as("SECRETARY_ASSISTANT"))).reason());
+        assertEquals(calls, store.calls);
     }
 
     private static final class FakeStore implements AppointmentLifecycleStore {
@@ -167,8 +192,21 @@ class ChangeAppointmentStatusUseCaseTest {
         }
     }
 
-    private static final class FakeEligibility implements AppointmentEligibility {
+    private static final class FakeEligibility implements AppointmentEligibility, AppointmentAvailability {
         boolean active = true;
+        boolean available = true;
+        UUID moving;
+
+        @Override
+        public boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt) {
+            throw new AssertionError("Rescheduling must exclude the appointment being moved.");
+        }
+
+        @Override
+        public boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt, UUID movingId) {
+            moving = movingId;
+            return available;
+        }
 
         @Override
         public boolean isPatientActive(UUID patientId) { return active; }
