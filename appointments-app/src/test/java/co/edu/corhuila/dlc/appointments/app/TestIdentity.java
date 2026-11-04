@@ -47,6 +47,8 @@ final class TestIdentity {
         registry.add("appointments.internal.jwt-public-key", () -> ("-----BEGIN PUBLIC KEY-----\n" + service
                 + "\n-----END PUBLIC KEY-----").replace("\n", "\\n"));
         registry.add("appointments.internal.jwt-issuer", () -> SERVICE_ISSUER);
+        // HTTP tests assert exact reminder rows; the periodic pass is exercised by its own tests.
+        registry.add("appointments.reminders.enabled", () -> "false");
         registry.add("appointments.internal.jwt-audience", () -> SERVICE_AUDIENCE);
         registry.add("appointments.auth.internal-url",
                 () -> "http://localhost:" + AUTH.getAddress().getPort());
