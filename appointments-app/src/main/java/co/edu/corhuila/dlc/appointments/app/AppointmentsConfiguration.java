@@ -19,6 +19,8 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffJwtSignatu
 import co.edu.corhuila.dlc.appointments.adapter.out.auth.AuthSessionValidationClient;
 import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleSchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
+import co.edu.corhuila.dlc.appointments.adapter.out.messaging.JdbcOutboxRelay;
+import co.edu.corhuila.dlc.appointments.adapter.out.messaging.RabbitEventPublisher;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareCompletions;
@@ -32,6 +34,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ReadDentistAvailabil
 import co.edu.corhuila.dlc.appointments.application.port.in.ReplaceDentistAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadDentistAvailabilityUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.RelayOutbox;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReminderNotifications;
 import co.edu.corhuila.dlc.appointments.application.usecase.RequestDueReminders;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvailabilityUseCase;
@@ -196,6 +199,21 @@ public class AppointmentsConfiguration {
     ReminderNotifications reminderNotifications(TransactionTemplate transactions, JdbcClient jdbc,
             JdbcOutboxWriter outbox) {
         return new ReminderNotifications(new JdbcReminderOutcomes(transactions, jdbc, outbox, UUID::randomUUID));
+    }
+
+    /** Outbox to RabbitMQ (appointments.events); required configuration only when the relay is enabled. */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "appointments.messaging.relay-enabled",
+            havingValue = "true", matchIfMissing = true)
+    RelayOutbox relayOutbox(TransactionTemplate transactions, JdbcClient jdbc, AppointmentsProperties properties) {
+        var messaging = properties.messaging();
+        if (messaging == null || messaging.rabbitmqUri() == null || messaging.rabbitmqUri().getHost() == null) {
+            throw new IllegalStateException("APPOINTMENTS_RABBITMQ_URI must be an absolute amqp URI.");
+        }
+        var publisher = new RabbitEventPublisher(RabbitEventPublisher.connectionFactory(messaging.rabbitmqUri()),
+                messaging.exchange(), Duration.ofSeconds(5));
+        return new RelayOutbox(new JdbcOutboxRelay(transactions, jdbc, publisher), Clock.systemUTC(),
+                messaging.relayBatchSize());
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
