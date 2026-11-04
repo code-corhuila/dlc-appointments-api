@@ -20,6 +20,7 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareCompletions;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareRelationships;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcClinicalAssignmentStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
@@ -161,7 +162,7 @@ public class AppointmentsConfiguration {
             AppointmentEligibility eligibility) {
         return new ChangeAppointmentStatusUseCase(new JdbcAppointmentLifecycleStore(transactions, jdbc, appointments,
                 keys, outbox, UUID::randomUUID), appointments, eligibility, new JdbcAppointmentAvailability(jdbc),
-                new RoleSchedulingAuthorization(), Clock.systemUTC());
+                new JdbcCareCompletions(jdbc), new RoleSchedulingAuthorization(), Clock.systemUTC());
     }
 
     /** HU-APT-004: ongoing assignments after Patients/Auth eligibility, atomic in PostgreSQL. */

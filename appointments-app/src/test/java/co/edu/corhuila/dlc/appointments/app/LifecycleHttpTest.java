@@ -29,6 +29,8 @@ class LifecycleHttpTest {
 
     @Autowired
     private MockMvc mvc;
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
 
     @BeforeAll
     static void requireDatabase() {
@@ -128,6 +130,31 @@ class LifecycleHttpTest {
     private static String reschedule(long version, OffsetDateTime start, String reason) {
         return "{\"expectedVersion\":" + version + ",\"startAt\":\"" + start + "\",\"endAt\":\""
                 + start.plusMinutes(30) + "\",\"reason\":\"" + reason + "\"}";
+    }
+
+    @Test
+    void completionWaitsForTheDentistDeclarationRecordedFromClinical() throws Exception {
+        String id = book(farStart());
+        call(id, "completions", "{\"expectedVersion\":1}", secretary())
+                .andExpect(status().isUnprocessableEntity());
+        call(id, "confirmations", "{\"expectedVersion\":1,\"channel\":\"PHONE\"}", secretary())
+                .andExpect(status().isOk());
+        call(id, "attention-starts", "{\"expectedVersion\":2}", secretary()).andExpect(status().isOk());
+        call(id, "completions", "{\"expectedVersion\":3}", secretary())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("APPOINTMENT_CONFLICT"));
+
+        jdbc.sql("""
+                INSERT INTO appointments.care_completions (appointment_id, event_id, clinical_record_id, consultation_id,
+                    patient_id, dentist_id, completed_at, clinical_version, recorded_at)
+                SELECT appointment_id, gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), patient_id, dentist_id,
+                    now(), 1, now() FROM appointments.appointments WHERE appointment_id = ?::uuid""").param(id).update();
+        call(id, "completions", "{\"expectedVersion\":3}", TestIdentity.bearer(TestIdentity.DENTIST, "DENTIST"))
+                .andExpect(status().isForbidden());
+        call(id, "completions", "{\"expectedVersion\":3}", secretary())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINALIZADA"))
+                .andExpect(jsonPath("$.version").value(4));
     }
 
     @Test
