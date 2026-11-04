@@ -3,6 +3,7 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
+import co.edu.corhuila.dlc.appointments.domain.model.ClinicalAssignmentNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.DentistNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAvailabilityException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidStatusTransitionException;
@@ -24,7 +25,8 @@ public final class HttpErrorMapper {
         if (failure instanceof RequestValidationException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.details(), trustedTraceId);
         }
-        if (failure instanceof AppointmentNotFoundException || failure instanceof DentistNotFoundException) {
+        if (failure instanceof AppointmentNotFoundException || failure instanceof DentistNotFoundException
+                || failure instanceof ClinicalAssignmentNotFoundException) {
             return response(404, "NOT_FOUND", "The resource does not exist.", null, trustedTraceId);
         }
         if (failure instanceof InvalidAvailabilityException invalid) {
