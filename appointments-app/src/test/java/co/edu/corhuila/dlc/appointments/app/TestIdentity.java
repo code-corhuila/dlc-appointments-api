@@ -26,6 +26,8 @@ final class TestIdentity {
     static final String AUDIENCE = "dlc-api-test";
     static final String SECRETARY = "a9900000-0000-4000-8000-0000000000c1";
     static final String DENTIST = "a9900000-0000-4000-8000-0000000000d1";
+    /** Any staff id with this prefix is an active Dentist in the fake Auth owner; tests use fresh ones. */
+    static final String DENTIST_PREFIX = "d0000000-";
     private static final RSAKey KEY = generate();
     private static final RSAKey OTHER_KEY = generate();
     private static final HttpServer AUTH = fakeAuth();
@@ -141,7 +143,7 @@ final class TestIdentity {
             });
             server.createContext("/internal/v1/staff/", exchange -> {
                 String id = exchange.getRequestURI().getPath().split("/")[4];
-                respond(exchange, DENTIST.equals(id) ? 200 : 404,
+                respond(exchange, DENTIST.equals(id) || id.startsWith(DENTIST_PREFIX) ? 200 : 404,
                         "{\"staffId\":\"" + id + "\",\"active\":true,\"roles\":[\"DENTIST\"]}");
             });
             server.createContext("/internal/v1/patients/", exchange -> {

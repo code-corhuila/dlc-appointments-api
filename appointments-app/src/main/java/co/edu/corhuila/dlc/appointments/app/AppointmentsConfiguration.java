@@ -16,8 +16,10 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
+import co.edu.corhuila.dlc.appointments.application.port.in.ListAppointments;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
+import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
 import java.net.URI;
@@ -104,6 +106,12 @@ public class AppointmentsConfiguration {
     @Bean
     ReadAppointment readAppointment(JdbcAppointmentRepository appointments) {
         return new ReadAppointmentUseCase(appointments);
+    }
+
+    /** HU-APT-003: calendar scoped by role before records and totals. */
+    @Bean
+    ListAppointments listAppointments(JdbcAppointmentRepository appointments) {
+        return new ListAppointmentsUseCase(appointments);
     }
 
     private static AuthSessionValidationClient authSessions(AppointmentsProperties.Auth auth) {

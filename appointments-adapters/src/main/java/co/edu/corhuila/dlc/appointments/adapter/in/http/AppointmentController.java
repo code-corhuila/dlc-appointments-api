@@ -1,11 +1,13 @@
 package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
+import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.AppointmentPageResponse;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.AppointmentResponse;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.CreateAppointmentRequest;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.AuthenticatedStaff;
 import co.edu.corhuila.dlc.appointments.application.model.ReaderContext;
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
+import co.edu.corhuila.dlc.appointments.application.port.in.ListAppointments;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,10 +31,20 @@ public class AppointmentController {
     static final String COLLECTION = "/api/v1/appointments";
     private final ScheduleAppointment scheduling;
     private final ReadAppointment reading;
+    private final ListAppointments listing;
 
-    public AppointmentController(ScheduleAppointment scheduling, ReadAppointment reading) {
+    public AppointmentController(ScheduleAppointment scheduling, ReadAppointment reading, ListAppointments listing) {
         this.scheduling = Objects.requireNonNull(scheduling, "scheduling");
         this.reading = Objects.requireNonNull(reading, "reading");
+        this.listing = Objects.requireNonNull(listing, "listing");
+    }
+
+    /** HU-APT-003 calendar: bounded, most recent first, within the reader's scope. */
+    @GetMapping(COLLECTION)
+    public AppointmentPageResponse list(HttpServletRequest request) {
+        var query = CalendarQueryParser.parse(request.getParameterMap());
+        var staff = staff(request);
+        return AppointmentPageResponse.from(listing.list(query, new ReaderContext(staff.userId(), staff.roles())));
     }
 
     /** HU-APT-003: 404 for a missing appointment and for one outside the reader's scope alike. */
