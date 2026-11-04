@@ -43,6 +43,14 @@ public class AppointmentLifecycleController {
         return change(valid.missing(), key, () -> valid.toCommand(id), request);
     }
 
+    @PostMapping(path = ITEM + "/reschedulings", consumes = "application/json")
+    public AppointmentResponse reschedule(@PathVariable("id") UUID id,
+            @RequestBody(required = false) LifecycleRequests.Reschedule body,
+            @RequestHeader(name = KEY, required = false) String key, HttpServletRequest request) {
+        var valid = body == null ? new LifecycleRequests.Reschedule(null, null, null, null, null) : body;
+        return change(valid.missing(), key, () -> valid.toCommand(id), request);
+    }
+
     @PostMapping(path = ITEM + "/attention-starts", consumes = "application/json")
     public AppointmentResponse startAttention(@PathVariable("id") UUID id,
             @RequestBody(required = false) LifecycleRequests.Version body,

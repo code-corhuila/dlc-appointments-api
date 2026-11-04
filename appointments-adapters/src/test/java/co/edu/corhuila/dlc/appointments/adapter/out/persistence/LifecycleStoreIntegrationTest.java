@@ -149,6 +149,30 @@ class LifecycleStoreIntegrationTest {
     }
 
     @Test
+    void reschedulingReplacesTheReminderAndPublishesTheNewInterval() {
+        Appointment a = scheduled();
+        var context = context("SECRETARY_ASSISTANT");
+        OffsetDateTime next = a.startAt().plusDays(400);
+        store.apply(new LifecycleCommand.Reschedule(a.id(), 1, next, next.plusMinutes(45), "Agenda", false), context,
+                current -> Optional.of(current.reschedule(next, next.plusMinutes(45), "Agenda", false,
+                        StaffRole.SECRETARY_ASSISTANT, context.actorUserId(), NOW)));
+
+        assertEquals("1 INVALIDATED|2 PENDING", jdbc.sql("SELECT string_agg(appointment_version || ' ' || status, '|' "
+                + "ORDER BY appointment_version) FROM appointments.appointment_reminders WHERE appointment_id = ?")
+                .param(a.id()).query(String.class).single());
+        assertEquals(next.minusHours(24).toInstant(), jdbc.sql("SELECT due_at FROM appointments.appointment_reminders "
+                + "WHERE appointment_id = ? AND appointment_version = 2").param(a.id())
+                .query(OffsetDateTime.class).single().toInstant());
+        Map<String, Object> event = row("SELECT payload->>'previousStartAt' AS previous, payload->>'newStartAt' AS start, "
+                + "payload->>'appointmentVersion' AS version, payload->>'overrideReason' IS NOT NULL AS has_override "
+                + "FROM appointments.outbox_events WHERE aggregate_id = ? AND event_type = 'AppointmentRescheduled'", a.id());
+        assertEquals(a.startAt().toInstant(), OffsetDateTime.parse((String) event.get("previous")).toInstant());
+        assertEquals(next.toInstant(), OffsetDateTime.parse((String) event.get("start")).toInstant());
+        assertEquals("2", event.get("version"));
+        assertEquals(false, event.get("has_override"));
+    }
+
+    @Test
     void anUnknownAppointmentIsNotFound() {
         assertThrows(AppointmentNotFoundException.class, () -> store.apply(new LifecycleCommand.StartAttention(
                 UUID.randomUUID(), 1), context("ADMINISTRATOR"), current -> Optional.empty()));
