@@ -9,4 +9,9 @@ import java.util.UUID;
  */
 public interface AppointmentAvailability {
     boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt);
+
+    /** Rescheduling (APT-010): the appointment being moved does not occupy its own new interval. */
+    default boolean isAvailable(UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt, UUID movingId) {
+        return isAvailable(dentistId, startAt, endAt);
+    }
 }

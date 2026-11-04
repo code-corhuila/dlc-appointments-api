@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.appointments.application.port.in;
 
 import co.edu.corhuila.dlc.appointments.domain.model.ConfirmationChannel;
 import co.edu.corhuila.dlc.appointments.domain.model.LifecycleOperation;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /** One HU-APT-002 request against an existing appointment, with the version the caller last read. */
@@ -19,6 +20,11 @@ public sealed interface LifecycleCommand {
     record Cancel(UUID appointmentId, long expectedVersion, String reason, boolean override)
             implements LifecycleCommand {
         public LifecycleOperation operation() { return LifecycleOperation.CANCEL; }
+    }
+
+    record Reschedule(UUID appointmentId, long expectedVersion, OffsetDateTime startAt, OffsetDateTime endAt,
+            String reason, boolean override) implements LifecycleCommand {
+        public LifecycleOperation operation() { return LifecycleOperation.RESCHEDULE; }
     }
 
     record StartAttention(UUID appointmentId, long expectedVersion) implements LifecycleCommand {
