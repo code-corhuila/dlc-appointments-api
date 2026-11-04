@@ -118,34 +118,32 @@ public final class JdbcAppointmentLifecycleStore implements AppointmentLifecycle
                 .update();
     }
 
-    /** APT-010: terminal changes and reschedules invalidate reminder work that has not been delivered yet. */
+    /**
+     * APT-010: terminal changes invalidate reminder work that has not been delivered yet. A reschedule (D10)
+     * invalidates the live reminder whatever its status; a delivered one keeps its outcome as history (DB-11).
+     */
     private void invalidateReminders(Transition transition) {
-        if (!TERMINAL.contains(transition.change().toStatus())
-                && transition.change().operation() != LifecycleOperation.RESCHEDULE) {
+        boolean reschedule = transition.change().operation() == LifecycleOperation.RESCHEDULE;
+        if (!reschedule && !TERMINAL.contains(transition.change().toStatus())) {
             return;
         }
         Timestamp now = Timestamp.from(transition.appointment().updatedAt());
         jdbc.sql("""
                 UPDATE appointments.appointment_reminders SET status = 'INVALIDATED', invalidated_at = ?, updated_at = ?
-                WHERE appointment_id = ? AND status IN ('PENDING','REQUESTED')""")
+                WHERE appointment_id = ? AND status IN """
+                        + (reschedule ? "('PENDING','REQUESTED','SENT','DELIVERY_FAILED')" : "('PENDING','REQUESTED')"))
                 .params(now, now, transition.appointment().id()).update();
     }
 
-    /**
-     * APT-005: the new version gets its reminder at the new start minus 24 hours. A reminder that was already
-     * SENT or DELIVERY_FAILED stays the live row (uk_appointment_reminders_live_appointment_id), so none is added.
-     */
+    /** APT-005: the new version gets its reminder at the new start minus 24 hours. */
     private void replaceReminder(Appointment a) {
         Timestamp now = Timestamp.from(a.updatedAt());
         jdbc.sql("""
                 INSERT INTO appointments.appointment_reminders (reminder_id, appointment_id, appointment_version,
                     due_at, channel, status, attempts, delivery_id, outcome_code, outcome_at, invalidated_at,
                     created_at, updated_at)
-                SELECT ?, ?, ?, ?, 'EMAIL', 'PENDING', 0, NULL, NULL, NULL, NULL, ?, ?
-                WHERE NOT EXISTS (SELECT 1 FROM appointments.appointment_reminders
-                    WHERE appointment_id = ? AND status <> 'INVALIDATED')""")
-                .params(ids.newId(), a.id(), a.version(), Timestamp.from(a.reminderDueAt().toInstant()), now, now,
-                        a.id())
+                VALUES (?, ?, ?, ?, 'EMAIL', 'PENDING', 0, NULL, NULL, NULL, NULL, ?, ?)""")
+                .params(ids.newId(), a.id(), a.version(), Timestamp.from(a.reminderDueAt().toInstant()), now, now)
                 .update();
     }
 
