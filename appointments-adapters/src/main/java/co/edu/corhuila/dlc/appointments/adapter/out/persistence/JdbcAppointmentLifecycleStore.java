@@ -83,6 +83,9 @@ public final class JdbcAppointmentLifecycleStore implements AppointmentLifecycle
                                   Function<Appointment, Optional<Transition>> decide) {
         Appointment current = appointments.findForUpdate(command.appointmentId())
                 .orElseThrow(AppointmentNotFoundException::new);
+        if (command instanceof LifecycleCommand.Reschedule || command instanceof LifecycleCommand.StartAttention) {
+            new JdbcPatientGates(jdbc).requireOpen(current.patientId());
+        }
         Optional<Transition> decided = decide.apply(current);
         Appointment result = decided.map(Transition::appointment).orElse(current);
         decided.ifPresent(transition -> {

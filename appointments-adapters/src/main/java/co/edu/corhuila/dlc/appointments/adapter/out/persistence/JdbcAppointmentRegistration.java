@@ -85,6 +85,7 @@ public final class JdbcAppointmentRegistration implements AppointmentRegistratio
             Runnable validateNewOperation) {
         try {
             return transactions.execute(status -> recover(context, proposed).orElseGet(() -> {
+                new JdbcPatientGates(jdbc).requireOpen(proposed.patientId());
                 validateNewOperation.run();
                 appointments.insert(proposed);
                 writeEffects(context, proposed);
