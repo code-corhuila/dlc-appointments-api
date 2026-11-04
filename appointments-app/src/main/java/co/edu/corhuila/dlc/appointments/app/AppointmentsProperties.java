@@ -9,10 +9,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Externalized configuration bound from the environment variables listed in .env.example. */
 @ConfigurationProperties(prefix = "appointments")
-public record AppointmentsProperties(String clinicTimezone, Security security, Auth auth, Patients patients) {
+public record AppointmentsProperties(String clinicTimezone, Security security, Internal internal, Auth auth,
+        Patients patients) {
 
     /** Trusted Auth public key (inline PEM or file), issuer and audience of staff access tokens. */
     public record Security(String jwtPublicKey, String jwtPublicKeyFile, String jwtIssuer, String jwtAudience) { }
+
+    /** Service JWTs accepted on /internal/v1; never the staff key, issuer or audience. */
+    public record Internal(String jwtPublicKey, String jwtPublicKeyFile, String jwtIssuer, String jwtAudience) { }
 
     /** Private Auth origin and this service's credential for POST /internal/v1/sessions/validations. */
     public record Auth(URI internalUrl, String serviceToken, String serviceTokenFile, Duration timeout) {
