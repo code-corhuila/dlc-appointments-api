@@ -166,4 +166,15 @@ class AuthSessionValidationClientTest {
         assertFalse(failure.toString().contains(STAFF));
         assertFalse(failure.toString().contains(SERVICE));
     }
+
+    /** A transport timeout can surface as an unchecked CancellationException; it must still fail closed. */
+    @Test
+    void uncheckedTransportFailureFailsClosed() {
+        org.springframework.http.client.ClientHttpRequestFactory cancelling = (uri, method) -> {
+            throw new java.util.concurrent.CancellationException();
+        };
+        var failing = new AuthSessionValidationClient(RestClient.builder().requestFactory(cancelling).build(),
+                ORIGIN, () -> SERVICE);
+        assertThrows(AuthSessionValidationUnavailableException.class, () -> failing.isActive("access-token"));
+    }
 }

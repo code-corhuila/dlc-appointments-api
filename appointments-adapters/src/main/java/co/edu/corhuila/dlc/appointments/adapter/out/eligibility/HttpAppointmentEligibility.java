@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.slf4j.MDC;
@@ -90,8 +91,8 @@ public final class HttpAppointmentEligibility implements AppointmentEligibility 
                         }
                         return Optional.of(body);
                     });
-        } catch (RestClientException | IllegalArgumentException failure) {
-            // Never retain owner bodies or transport messages.
+        } catch (RestClientException | IllegalArgumentException | CancellationException failure) {
+            // Transport, parsing and timeout cancellation fail closed; never retain owner bodies or messages.
             throw unavailable();
         }
     }
