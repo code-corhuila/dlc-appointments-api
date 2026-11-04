@@ -15,8 +15,10 @@ import co.edu.corhuila.dlc.appointments.adapter.out.auth.AuthSessionValidationCl
 import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleSchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcDentistAvailabilityStore;
+import co.edu.corhuila.dlc.appointments.application.port.in.ChangeAppointmentStatus;
 import co.edu.corhuila.dlc.appointments.application.port.in.ListAppointments;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadDentistAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReplaceDentistAvailability;
@@ -25,6 +27,7 @@ import co.edu.corhuila.dlc.appointments.application.usecase.ReadDentistAvailabil
 import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvailabilityUseCase;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
+import co.edu.corhuila.dlc.appointments.application.usecase.ChangeAppointmentStatusUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
@@ -129,6 +132,16 @@ public class AppointmentsConfiguration {
         return new ScheduleAppointmentUseCase(eligibility, new JdbcAppointmentAvailability(jdbc),
                 new JdbcAppointmentRegistration(transactions, jdbc, appointments, keys, outbox, UUID::randomUUID),
                 new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC());
+    }
+
+    /** HU-APT-002: staff-only lifecycle changes, each one atomic in PostgreSQL. */
+    @Bean
+    ChangeAppointmentStatus changeAppointmentStatus(TransactionTemplate transactions, JdbcClient jdbc,
+            JdbcAppointmentRepository appointments, JdbcIdempotencyStore keys, JdbcOutboxWriter outbox,
+            AppointmentEligibility eligibility) {
+        return new ChangeAppointmentStatusUseCase(new JdbcAppointmentLifecycleStore(transactions, jdbc, appointments,
+                keys, outbox, UUID::randomUUID), appointments, eligibility, new RoleSchedulingAuthorization(),
+                Clock.systemUTC());
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
