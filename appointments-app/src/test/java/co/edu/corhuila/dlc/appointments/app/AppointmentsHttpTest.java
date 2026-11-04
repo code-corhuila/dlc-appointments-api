@@ -15,6 +15,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Annex C "Sobre de error y correlación" checks through the composed application. */
@@ -27,6 +29,41 @@ class AppointmentsHttpTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @DynamicPropertySource
+    static void identity(DynamicPropertyRegistry registry) {
+        TestIdentity.register(registry);
+    }
+
+    @Test
+    void protectedRouteWithoutTokenIsUnauthorized() throws Exception {
+        mvc.perform(get("/api/v1/appointments"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", "Bearer"))
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.traceId").isString());
+    }
+
+    @Test
+    void tokenWithAlgorithmOtherThanRs256IsUnauthorized() throws Exception {
+        mvc.perform(get("/api/v1/appointments").header("Authorization", TestIdentity.unsigned(TestIdentity.SECRETARY)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/appointments").header("Authorization", TestIdentity.hs256(TestIdentity.SECRETARY)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void expiredTokenIsUnauthorized() throws Exception {
+        mvc.perform(get("/api/v1/appointments").header("Authorization", TestIdentity.expired(TestIdentity.SECRETARY)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenSignedWithAnotherKeyIsUnauthorized() throws Exception {
+        mvc.perform(get("/api/v1/appointments")
+                        .header("Authorization", TestIdentity.signedWithOtherKey(TestIdentity.SECRETARY)))
+                .andExpect(status().isUnauthorized());
+    }
 
     @Test
     void healthAnswersWithoutTokenAndGeneratesCorrelationId() throws Exception {
@@ -51,7 +88,8 @@ class AppointmentsHttpTest {
 
     @Test
     void unknownRouteAnswersNotFoundEnvelopeWithTraceId() throws Exception {
-        mvc.perform(get("/api/v1/does-not-exist").header("X-Correlation-Id", "trace-404"))
+        mvc.perform(get("/api/v1/does-not-exist").header("X-Correlation-Id", "trace-404")
+                        .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT")))
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("X-Correlation-Id", "trace-404"))
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"))
