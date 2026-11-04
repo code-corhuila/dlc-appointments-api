@@ -60,6 +60,15 @@ public class AppointmentLifecycleController {
                 () -> new LifecycleCommand.StartAttention(id, valid.expectedVersion()), request);
     }
 
+    @PostMapping(path = ITEM + "/completions", consumes = "application/json")
+    public AppointmentResponse complete(@PathVariable("id") UUID id,
+            @RequestBody(required = false) LifecycleRequests.Version body,
+            @RequestHeader(name = KEY, required = false) String key, HttpServletRequest request) {
+        var valid = body == null ? new LifecycleRequests.Version(null) : body;
+        return change(valid.missing(), key,
+                () -> new LifecycleCommand.Complete(id, valid.expectedVersion()), request);
+    }
+
     @PostMapping(path = ITEM + "/no-shows", consumes = "application/json")
     public AppointmentResponse noShow(@PathVariable("id") UUID id,
             @RequestBody(required = false) LifecycleRequests.NoShow body,

@@ -7,8 +7,10 @@ import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailabi
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentLifecycleStore;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentReader;
+import co.edu.corhuila.dlc.appointments.application.port.out.CareCompletions;
 import co.edu.corhuila.dlc.appointments.application.port.out.SchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
+import co.edu.corhuila.dlc.appointments.domain.model.AppointmentConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentStatus;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
@@ -30,16 +32,18 @@ public final class ChangeAppointmentStatusUseCase implements ChangeAppointmentSt
     private final AppointmentReader reader;
     private final AppointmentEligibility eligibility;
     private final AppointmentAvailability availability;
+    private final CareCompletions completions;
     private final SchedulingAuthorization authorization;
     private final Clock clock;
 
     public ChangeAppointmentStatusUseCase(AppointmentLifecycleStore store, AppointmentReader reader,
-            AppointmentEligibility eligibility, AppointmentAvailability availability,
+            AppointmentEligibility eligibility, AppointmentAvailability availability, CareCompletions completions,
             SchedulingAuthorization authorization, Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
         this.reader = Objects.requireNonNull(reader, "reader");
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
         this.availability = Objects.requireNonNull(availability, "availability");
+        this.completions = Objects.requireNonNull(completions, "completions");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -76,8 +80,20 @@ public final class ChangeAppointmentStatusUseCase implements ChangeAppointmentSt
             case LifecycleCommand.Reschedule r -> moved(current.reschedule(r.startAt(), r.endAt(), r.reason(),
                     r.override(), role, actor, now));
             case LifecycleCommand.StartAttention s -> current.startAttention(actor, now);
+            case LifecycleCommand.Complete c -> declared(current, current.complete(actor, now));
             case LifecycleCommand.NoShow n -> current.markNoShow(n.reason(), actor, now);
         });
+    }
+
+    /** D8: finalization needs the Dentist's declaration for this appointment's patient and Dentist. */
+    private Transition declared(Appointment current, Transition transition) {
+        boolean matches = completions.find(current.id())
+                .filter(d -> d.patientId().equals(current.patientId()) && d.dentistId().equals(current.dentistId()))
+                .isPresent();
+        if (!matches) {
+            throw new AppointmentConflictException("The Dentist has not declared the clinical work complete.");
+        }
+        return transition;
     }
 
     /** Inside the store's transaction, after the state machine accepted the move (APT-002 for the new interval). */

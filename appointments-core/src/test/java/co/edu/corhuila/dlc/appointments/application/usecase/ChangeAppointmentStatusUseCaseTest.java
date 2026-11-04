@@ -11,6 +11,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.LifecycleCommand;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentLifecycleStore;
+import co.edu.corhuila.dlc.appointments.application.port.out.CareCompletions;
 import co.edu.corhuila.dlc.appointments.application.port.out.SchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
@@ -47,7 +48,7 @@ class ChangeAppointmentStatusUseCaseTest {
     private final FakeStore store = new FakeStore();
     private final FakeEligibility eligibility = new FakeEligibility();
     private final ChangeAppointmentStatusUseCase useCase = new ChangeAppointmentStatusUseCase(store,
-            id -> Optional.ofNullable(store.current).filter(a -> a.id().equals(id)), eligibility, eligibility,
+            id -> Optional.ofNullable(store.current).filter(a -> a.id().equals(id)), eligibility, eligibility, eligibility,
             STAFF_ONLY, Clock.fixed(NOW, ZoneOffset.UTC));
 
     private static SchedulingContext as(String... roles) {
@@ -101,7 +102,7 @@ class ChangeAppointmentStatusUseCaseTest {
         store.current = in(AppointmentStatus.PROGRAMADA, 1);
         Instant late = START.toInstant().minusSeconds(3600);
         var lateUseCase = new ChangeAppointmentStatusUseCase(store, id -> Optional.of(store.current), eligibility,
-                eligibility,
+                eligibility, eligibility,
                 STAFF_ONLY, Clock.fixed(late, ZoneOffset.UTC));
 
         lateUseCase.change(new LifecycleCommand.Cancel(ID, 1, "Emergency", true), as("ADMINISTRATOR",
@@ -142,7 +143,7 @@ class ChangeAppointmentStatusUseCaseTest {
     void noShowIsRecordedAfterTheEnd() {
         store.current = in(AppointmentStatus.PROGRAMADA, 1);
         var afterEnd = new ChangeAppointmentStatusUseCase(store, id -> Optional.of(store.current), eligibility,
-                eligibility,
+                eligibility, eligibility,
                 STAFF_ONLY, Clock.fixed(START.plusHours(1).toInstant(), ZoneOffset.UTC));
         assertEquals(AppointmentStatus.NO_ASISTIO, afterEnd.change(new LifecycleCommand.NoShow(ID, 1, "Absent"),
                 as("ADMINISTRATOR")).status());
@@ -171,6 +172,24 @@ class ChangeAppointmentStatusUseCaseTest {
         assertEquals(calls, store.calls);
     }
 
+    @Test
+    void completionNeedsTheDentistDeclarationForThisPatientAndDentist() {
+        Appointment attending = in(AppointmentStatus.EN_ATENCION, 4);
+        store.current = attending;
+        var command = new LifecycleCommand.Complete(ID, 4);
+        assertThrows(co.edu.corhuila.dlc.appointments.domain.model.AppointmentConflictException.class,
+                () -> useCase.change(command, as("SECRETARY_ASSISTANT")));
+        eligibility.declaration = Optional.of(new CareCompletions.Declaration(attending.patientId(), UUID.randomUUID()));
+        assertThrows(co.edu.corhuila.dlc.appointments.domain.model.AppointmentConflictException.class,
+                () -> useCase.change(command, as("SECRETARY_ASSISTANT")));
+
+        eligibility.declaration = Optional.of(new CareCompletions.Declaration(attending.patientId(),
+                attending.dentistId()));
+        assertEquals(AppointmentStatus.FINALIZADA, useCase.change(command, as("SECRETARY_ASSISTANT")).status());
+        store.current = in(AppointmentStatus.CONFIRMADA, 4);
+        assertThrows(InvalidStatusTransitionException.class, () -> useCase.change(command, as("ADMINISTRATOR")));
+    }
+
     private static final class FakeStore implements AppointmentLifecycleStore {
         Appointment current;
         StatusChange lastChange;
@@ -192,7 +211,15 @@ class ChangeAppointmentStatusUseCaseTest {
         }
     }
 
-    private static final class FakeEligibility implements AppointmentEligibility, AppointmentAvailability {
+    private static final class FakeEligibility implements AppointmentEligibility, AppointmentAvailability,
+            CareCompletions {
+        Optional<CareCompletions.Declaration> declaration = Optional.empty();
+
+        @Override
+        public Optional<CareCompletions.Declaration> find(UUID appointmentId) {
+            return declaration;
+        }
+
         boolean active = true;
         boolean available = true;
         UUID moving;
