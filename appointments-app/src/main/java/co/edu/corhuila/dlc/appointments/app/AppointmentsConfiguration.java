@@ -5,6 +5,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderOutcomes;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderRequests;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -31,6 +32,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ReadDentistAvailabil
 import co.edu.corhuila.dlc.appointments.application.port.in.ReplaceDentistAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadDentistAvailabilityUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.ReminderNotifications;
 import co.edu.corhuila.dlc.appointments.application.usecase.RequestDueReminders;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvailabilityUseCase;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
@@ -187,6 +189,13 @@ public class AppointmentsConfiguration {
             @org.springframework.beans.factory.annotation.Value("${appointments.reminders.batch-size:100}") int batch) {
         return new RequestDueReminders(new JdbcReminderRequests(transactions, jdbc, outbox, UUID::randomUUID),
                 Clock.systemUTC(), batch);
+    }
+
+    /** ADR-005: dlc-worker reads minimum reminder details and reports delivery outcomes. */
+    @Bean
+    ReminderNotifications reminderNotifications(TransactionTemplate transactions, JdbcClient jdbc,
+            JdbcOutboxWriter outbox) {
+        return new ReminderNotifications(new JdbcReminderOutcomes(transactions, jdbc, outbox, UUID::randomUUID));
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
