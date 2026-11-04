@@ -2,6 +2,9 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
+import co.edu.corhuila.dlc.appointments.domain.model.DentistNotFoundException;
+import co.edu.corhuila.dlc.appointments.domain.model.InvalidAvailabilityException;
+import co.edu.corhuila.dlc.appointments.domain.model.StaleVersionException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -19,8 +22,16 @@ public final class HttpErrorMapper {
         if (failure instanceof RequestValidationException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.details(), trustedTraceId);
         }
-        if (failure instanceof AppointmentNotFoundException) {
+        if (failure instanceof AppointmentNotFoundException || failure instanceof DentistNotFoundException) {
             return response(404, "NOT_FOUND", "The resource does not exist.", null, trustedTraceId);
+        }
+        if (failure instanceof InvalidAvailabilityException invalid) {
+            return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.errors().stream()
+                    .map(e -> new ApiError.Detail(e.field(), e.message())).toList(), trustedTraceId);
+        }
+        if (failure instanceof StaleVersionException) {
+            return response(409, "STALE_VERSION", "The resource has changed. Reload it before submitting again.",
+                    null, trustedTraceId);
         }
         if (failure instanceof InvalidAppointmentException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.",
