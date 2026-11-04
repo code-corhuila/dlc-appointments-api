@@ -5,6 +5,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcPatientGuardStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderOutcomes;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderRequests;
 import javax.sql.DataSource;
@@ -44,6 +45,7 @@ import co.edu.corhuila.dlc.appointments.application.usecase.ChangeAppointmentSta
 import co.edu.corhuila.dlc.appointments.application.usecase.ClinicalAssignmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.InternalRelationshipReads;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.PatientGuards;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
 import java.net.URI;
@@ -214,6 +216,12 @@ public class AppointmentsConfiguration {
                 messaging.exchange(), Duration.ofSeconds(5));
         return new RelayOutbox(new JdbcOutboxRelay(transactions, jdbc, publisher), Clock.systemUTC(),
                 messaging.relayBatchSize());
+    }
+
+    /** #17 ADR-017 guards for Patients and Clinical, serialized on the patient gate. */
+    @Bean
+    PatientGuards patientGuards(TransactionTemplate transactions, JdbcClient jdbc) {
+        return new PatientGuards(new JdbcPatientGuardStore(transactions, jdbc), UUID::randomUUID, Clock.systemUTC());
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
