@@ -94,7 +94,7 @@ class AppointmentDtoContractTest {
     @Test
     void responseExplicitlyMapsAuthoritativeAppointmentAndOriginalVersion() {
         var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
-        var response = AppointmentResponse.from(new SchedulingResult(appointment, 7));
+        var response = AppointmentResponse.from(new SchedulingResult(appointment, 7, true));
         assertEquals(ID, response.id());
         assertEquals(PATIENT, response.patientId());
         assertEquals(DENTIST, response.dentistId());
@@ -109,7 +109,7 @@ class AppointmentDtoContractTest {
     @Test
     void responseJsonIsFlatAndContainsOnlyRequiredAndDerivableFields() throws Exception {
         var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
-        JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(new SchedulingResult(appointment, 7))));
+        JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(new SchedulingResult(appointment, 7, true))));
         assertEquals(Set.of("id", "patientId", "dentistId", "startAt", "endAt", "status", "version",
                 "reason", "reminderDueAt"), fields(tree));
         assertEquals(ID.toString(), tree.get("id").textValue());

@@ -24,7 +24,8 @@ import static co.edu.corhuila.dlc.appointments.domain.model.SchedulingException.
 
 class ScheduleAppointmentUseCaseTest {
     private final SchedulingContext context = new SchedulingContext(
-            UUID.randomUUID(), UUID.randomUUID(), "retry-key-0001");
+            UUID.randomUUID(), UUID.randomUUID(), "retry-key-0001", java.util.Set.of("SECRETARY_ASSISTANT"),
+            UUID.randomUUID());
     private final FakePorts ports = new FakePorts();
     private static final Instant NOW = Instant.parse("2026-10-30T15:00:00Z");
     private static final UUID GENERATED = UUID.fromString("00000000-0000-0000-0000-0000000000ff");
@@ -115,7 +116,7 @@ class ScheduleAppointmentUseCaseTest {
 
     private SchedulingResult originalResult() {
         return new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), start, command.endAt(), command.reason(), context.actorUserId(), NOW), 7);
+                command.dentistId(), start, command.endAt(), command.reason(), context.actorUserId(), NOW), 7, false);
     }
 
     private void assertDefinitiveRecovery() {
@@ -132,7 +133,7 @@ class ScheduleAppointmentUseCaseTest {
     @Test
     void returnsAuthoritativeRegistrationResultWithDifferentIdentifier() {
         ports.result = new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), command.startAt(), command.endAt(), command.reason(), context.actorUserId(), NOW), 7);
+                command.dentistId(), command.startAt(), command.endAt(), command.reason(), context.actorUserId(), NOW), 7, false);
         SchedulingResult result = useCase.schedule(command, context);
         assertSame(ports.result, result);
         assertEquals(7, result.version());
@@ -365,7 +366,7 @@ class ScheduleAppointmentUseCaseTest {
             registrations++;
             if (failAfterValidation) throw failure;
             registered = appointment;
-            return result == null ? new SchedulingResult(appointment, 1) : result;
+            return result == null ? new SchedulingResult(appointment, 1, true) : result;
         }
     }
 }
