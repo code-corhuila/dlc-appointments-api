@@ -3,6 +3,8 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.MediaType;
@@ -13,6 +15,9 @@ public final class HttpErrorMapper {
     private HttpErrorMapper() { }
 
     public static ResponseEntity<ApiError> map(Exception failure, String trustedTraceId) {
+        if (failure instanceof RequestValidationException invalid) {
+            return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.details(), trustedTraceId);
+        }
         if (failure instanceof InvalidAppointmentException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.",
                     List.of(new ApiError.Detail(invalid.field(), invalid.getMessage())), trustedTraceId);
@@ -34,6 +39,19 @@ public final class HttpErrorMapper {
 
     public static ResponseEntity<ApiError> invalidRequest(String trustedTraceId) {
         return response(400, "VALIDATION_ERROR", "The request is invalid.", null, trustedTraceId);
+    }
+
+    /** Names the offending JSON field for typing and unknown-field errors; never echoes the submitted value. */
+    public static ApiError invalidBody(Throwable cause, String trustedTraceId) {
+        if (cause instanceof JsonMappingException mapping && !mapping.getPath().isEmpty()
+                && mapping.getPath().get(0).getFieldName() != null) {
+            String field = mapping.getPath().get(0).getFieldName();
+            String message = cause instanceof UnrecognizedPropertyException
+                    ? "Unknown field." : "Invalid value or format.";
+            return new ApiError("VALIDATION_ERROR", "The request is invalid.",
+                    List.of(new ApiError.Detail(field, message)), trustedTraceId);
+        }
+        return invalidRequest(trustedTraceId).getBody();
     }
 
     /** Envelope for statuses Spring MVC raises before any controller runs; empty when not covered. */

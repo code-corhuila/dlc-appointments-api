@@ -300,10 +300,9 @@ class ScheduleAppointmentUseCaseTest {
         SchedulingException authorizationFailure, recoveryFailure;
         SchedulingResult recovered;
 
-        public void requireSchedulingAllowed(UUID actorUserId, UUID sessionId) {
+        public void requireSchedulingAllowed(SchedulingContext operation) {
             authorizations++;
-            assertEquals(context.actorUserId(), actorUserId);
-            assertEquals(context.sessionId(), sessionId);
+            assertSame(context, operation);
             if (authorizationFailure != null) throw authorizationFailure;
         }
 

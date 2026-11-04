@@ -41,6 +41,9 @@ final class TestIdentity {
         registry.add("appointments.auth.internal-url",
                 () -> "http://localhost:" + AUTH.getAddress().getPort());
         registry.add("appointments.auth.service-token", () -> "synthetic-service-token");
+        registry.add("appointments.patients.internal-url",
+                () -> "http://localhost:" + AUTH.getAddress().getPort());
+        registry.add("appointments.patients.service-token", () -> "synthetic-patients-token");
         // Unreachable on purpose: HTTP tests that need the database configure a real one.
         registry.add("spring.datasource.url", () -> "jdbc:postgresql://localhost:1/unreachable");
     }
@@ -101,6 +104,15 @@ final class TestIdentity {
         }
     }
 
+    private static void respond(com.sun.net.httpserver.HttpExchange exchange, int status, String json)
+            throws java.io.IOException {
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, status == 200 ? body.length : -1);
+        if (status == 200) exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
     private static RSAKey generate() {
         try {
             return new RSAKeyGenerator(2048).keyID(UUID.randomUUID().toString()).generate();
@@ -109,7 +121,14 @@ final class TestIdentity {
         }
     }
 
-    /** Answers every session validation as active; JWT checks happen before this call. */
+    static final String ACTIVE_PATIENT = "a9900000-0000-4000-8000-0000000000e1";
+    static final String INACTIVE_PATIENT = "a9900000-0000-4000-8000-0000000000e9";
+    static final String UNVERIFIABLE_PATIENT = "a9900000-0000-4000-8000-0000000000e8";
+
+    /**
+     * Fake Auth and Patients owners: every session is active; DENTIST is an active Dentist and other staff are
+     * unknown; INACTIVE_PATIENT is inactive, UNVERIFIABLE_PATIENT's owner answers 503, any other patient is active.
+     */
     private static HttpServer fakeAuth() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
@@ -119,6 +138,16 @@ final class TestIdentity {
                 exchange.sendResponseHeaders(200, body.length);
                 exchange.getResponseBody().write(body);
                 exchange.close();
+            });
+            server.createContext("/internal/v1/staff/", exchange -> {
+                String id = exchange.getRequestURI().getPath().split("/")[4];
+                respond(exchange, DENTIST.equals(id) ? 200 : 404,
+                        "{\"staffId\":\"" + id + "\",\"active\":true,\"roles\":[\"DENTIST\"]}");
+            });
+            server.createContext("/internal/v1/patients/", exchange -> {
+                String id = exchange.getRequestURI().getPath().split("/")[4];
+                respond(exchange, UNVERIFIABLE_PATIENT.equals(id) ? 503 : 200,
+                        "{\"patientId\":\"" + id + "\",\"active\":" + !INACTIVE_PATIENT.equals(id) + ",\"version\":1}");
             });
             server.start();
             return server;
