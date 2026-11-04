@@ -1,6 +1,17 @@
 spring:
   application:
     name: dlc-appointments-api
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  web:
+    resources:
+      add-mappings: false
 
 server:
   port: ${SERVER_PORT:8080}
+
+logging:
+  structured:
+    format:
+      console: logstash
