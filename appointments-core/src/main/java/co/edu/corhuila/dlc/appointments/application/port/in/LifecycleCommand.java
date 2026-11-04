@@ -31,6 +31,10 @@ public sealed interface LifecycleCommand {
         public LifecycleOperation operation() { return LifecycleOperation.START_ATTENTION; }
     }
 
+    record Complete(UUID appointmentId, long expectedVersion) implements LifecycleCommand {
+        public LifecycleOperation operation() { return LifecycleOperation.COMPLETE; }
+    }
+
     record NoShow(UUID appointmentId, long expectedVersion, String reason) implements LifecycleCommand {
         public LifecycleOperation operation() { return LifecycleOperation.NO_SHOW; }
     }
