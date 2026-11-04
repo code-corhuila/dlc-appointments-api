@@ -128,6 +128,14 @@ class AppointmentsHttpTest {
     }
 
     @Test
+    void malformedAppointmentIdIsAValidationError() throws Exception {
+        mvc.perform(get("/api/v1/appointments/not-a-uuid")
+                        .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void dentistCannotScheduleAppointments() throws Exception {
         schedule(VALID_BODY, "retry-key-0001", "DENTIST")
                 .andExpect(status().isForbidden())
