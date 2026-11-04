@@ -73,6 +73,13 @@ class AppointmentsHttpTest {
     }
 
     @Test
+    void readinessReportsNotReadyWhileItsOwnDatabaseIsUnreachable() throws Exception {
+        mvc.perform(get("/health/ready"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value("NOT_READY"));
+    }
+
+    @Test
     void receivedCorrelationIdIsReturned() throws Exception {
         mvc.perform(get("/health").header("X-Correlation-Id", "e2e-saga-1"))
                 .andExpect(header().string("X-Correlation-Id", "e2e-saga-1"));
