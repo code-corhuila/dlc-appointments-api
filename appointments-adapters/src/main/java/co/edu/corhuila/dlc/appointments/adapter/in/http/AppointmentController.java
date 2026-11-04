@@ -4,15 +4,12 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.AppointmentPageResponse;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.AppointmentResponse;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.CreateAppointmentRequest;
-import co.edu.corhuila.dlc.appointments.adapter.in.http.security.AuthenticatedStaff;
 import co.edu.corhuila.dlc.appointments.application.model.ReaderContext;
-import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
 import co.edu.corhuila.dlc.appointments.application.port.in.ListAppointments;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -43,14 +40,14 @@ public class AppointmentController {
     @GetMapping(COLLECTION)
     public AppointmentPageResponse list(HttpServletRequest request) {
         var query = CalendarQueryParser.parse(request.getParameterMap());
-        var staff = staff(request);
+        var staff = StaffRequests.staff(request);
         return AppointmentPageResponse.from(listing.list(query, new ReaderContext(staff.userId(), staff.roles())));
     }
 
     /** HU-APT-003: 404 for a missing appointment and for one outside the reader's scope alike. */
     @GetMapping(COLLECTION + "/{id}")
     public AppointmentResponse read(@PathVariable("id") UUID id, HttpServletRequest request) {
-        var staff = staff(request);
+        var staff = StaffRequests.staff(request);
         return AppointmentResponse.from(reading.read(id, new ReaderContext(staff.userId(), staff.roles())));
     }
 
@@ -60,7 +57,7 @@ public class AppointmentController {
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request) {
         validate(body, idempotencyKey);
-        var result = scheduling.schedule(body.toCommand(), context(request, idempotencyKey));
+        var result = scheduling.schedule(body.toCommand(), StaffRequests.context(request, idempotencyKey));
         var response = AppointmentResponse.from(result);
         return result.created()
                 ? ResponseEntity.created(URI.create(COLLECTION + "/" + response.id())).body(response)
@@ -77,33 +74,11 @@ public class AppointmentController {
         if (body == null || body.reason() == null || body.reason().isBlank()) {
             details.add(new ApiError.Detail("reason", "Required, 1 to 500 characters."));
         }
-        if (idempotencyKey == null || idempotencyKey.length() < 8 || idempotencyKey.length() > 128) {
-            details.add(new ApiError.Detail("Idempotency-Key", "Header required, 8 to 128 characters."));
-        }
+        StaffRequests.checkIdempotencyKey(idempotencyKey, details);
         if (!details.isEmpty()) throw new RequestValidationException(details);
     }
 
     private static ApiError.Detail required(String field) {
         return new ApiError.Detail(field, "Required value is missing or invalid.");
-    }
-
-    private static SchedulingContext context(HttpServletRequest request, String idempotencyKey) {
-        var staff = staff(request);
-        return new SchedulingContext(staff.userId(), staff.sessionId(), idempotencyKey, staff.roles(),
-                correlationUuid(request));
-    }
-
-    private static AuthenticatedStaff staff(HttpServletRequest request) {
-        return (AuthenticatedStaff) request.getAttribute(AuthenticatedStaff.ATTRIBUTE);
-    }
-
-    /** Event and audit metadata need a UUID; a non-UUID correlation ID maps to a stable name-based UUID. */
-    private static UUID correlationUuid(HttpServletRequest request) {
-        String correlation = String.valueOf(request.getAttribute(HttpExceptionHandler.TRUSTED_TRACE_ID_ATTRIBUTE));
-        try {
-            return UUID.fromString(correlation);
-        } catch (IllegalArgumentException notUuid) {
-            return UUID.nameUUIDFromBytes(correlation.getBytes(StandardCharsets.UTF_8));
-        }
     }
 }
