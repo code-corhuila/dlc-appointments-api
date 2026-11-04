@@ -10,7 +10,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /** Externalized configuration bound from the environment variables listed in .env.example. */
 @ConfigurationProperties(prefix = "appointments")
 public record AppointmentsProperties(String clinicTimezone, Security security, Internal internal, Auth auth,
-        Patients patients) {
+        Patients patients, Messaging messaging) {
+
+    /** Outbox relay: broker URI with credentials (secret), exchange and bounded batch. */
+    public record Messaging(URI rabbitmqUri, String exchange, int relayBatchSize) { }
 
     /** Trusted Auth public key (inline PEM or file), issuer and audience of staff access tokens. */
     public record Security(String jwtPublicKey, String jwtPublicKeyFile, String jwtIssuer, String jwtAudience) { }

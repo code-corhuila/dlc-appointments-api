@@ -44,6 +44,12 @@ appointments:
     enabled: ${APPOINTMENTS_REMINDERS_ENABLED:true}
     interval: ${APPOINTMENTS_REMINDERS_INTERVAL:PT30S}
     batch-size: ${APPOINTMENTS_REMINDERS_BATCH_SIZE:100}
+  messaging:
+    relay-enabled: ${APPOINTMENTS_RELAY_ENABLED:true}
+    relay-interval: ${APPOINTMENTS_RELAY_INTERVAL:PT2S}
+    relay-batch-size: ${APPOINTMENTS_RELAY_BATCH_SIZE:100}
+    rabbitmq-uri: ${APPOINTMENTS_RABBITMQ_URI:}
+    exchange: ${APPOINTMENTS_EVENTS_EXCHANGE:appointments.events}
   internal:
     jwt-public-key: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY:}
     jwt-public-key-file: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY_FILE:}
