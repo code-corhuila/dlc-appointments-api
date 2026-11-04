@@ -16,6 +16,7 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcClinicalAssignmentStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcDentistAvailabilityStore;
 import co.edu.corhuila.dlc.appointments.application.port.in.ChangeAppointmentStatus;
@@ -28,6 +29,7 @@ import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvaila
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import co.edu.corhuila.dlc.appointments.application.usecase.ChangeAppointmentStatusUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.ClinicalAssignmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
@@ -142,6 +144,14 @@ public class AppointmentsConfiguration {
         return new ChangeAppointmentStatusUseCase(new JdbcAppointmentLifecycleStore(transactions, jdbc, appointments,
                 keys, outbox, UUID::randomUUID), appointments, eligibility, new JdbcAppointmentAvailability(jdbc),
                 new RoleSchedulingAuthorization(), Clock.systemUTC());
+    }
+
+    /** HU-APT-004: ongoing assignments after Patients/Auth eligibility, atomic in PostgreSQL. */
+    @Bean
+    ClinicalAssignmentsUseCase clinicalAssignments(TransactionTemplate transactions, JdbcClient jdbc,
+            JdbcIdempotencyStore keys, JdbcOutboxWriter outbox, AppointmentEligibility eligibility) {
+        return new ClinicalAssignmentsUseCase(new JdbcClinicalAssignmentStore(transactions, jdbc, keys, outbox,
+                UUID::randomUUID), eligibility, UUID::randomUUID, Clock.systemUTC());
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
