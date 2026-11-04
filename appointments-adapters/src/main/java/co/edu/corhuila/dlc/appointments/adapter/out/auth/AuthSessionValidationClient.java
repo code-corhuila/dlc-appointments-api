@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.*;
 import java.net.URI;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
 import org.springframework.http.*;
 import org.springframework.web.client.RestClient;
@@ -63,8 +64,8 @@ public final class AuthSessionValidationClient {
                         }
                         return result.get("active").booleanValue();
                     });
-        } catch (RestClientException | InvalidMediaTypeException failure) {
-            // Do not retain bodies, messages or causes from transport/parsing failures.
+        } catch (RestClientException | InvalidMediaTypeException | CancellationException failure) {
+            // Transport, parsing and timeout cancellation fail closed; retain no bodies, messages or causes.
             throw unavailable();
         }
     }
