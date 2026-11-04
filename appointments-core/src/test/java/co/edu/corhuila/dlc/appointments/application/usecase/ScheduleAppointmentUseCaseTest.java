@@ -12,7 +12,10 @@ import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentStatus;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -21,12 +24,33 @@ import static co.edu.corhuila.dlc.appointments.domain.model.SchedulingException.
 
 class ScheduleAppointmentUseCaseTest {
     private final SchedulingContext context = new SchedulingContext(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            UUID.randomUUID(), UUID.randomUUID(), "retry-key-0001");
     private final FakePorts ports = new FakePorts();
-    private final ScheduleAppointment useCase = new ScheduleAppointmentUseCase(ports, ports, ports, ports);
+    private static final Instant NOW = Instant.parse("2026-10-30T15:00:00Z");
+    private static final UUID GENERATED = UUID.fromString("00000000-0000-0000-0000-0000000000ff");
+    private final ScheduleAppointment useCase = new ScheduleAppointmentUseCase(ports, ports, ports, ports,
+            () -> GENERATED, Clock.fixed(NOW, ZoneOffset.UTC));
     private final OffsetDateTime start = OffsetDateTime.parse("2026-11-01T09:00:00-05:00");
     private final ScheduleAppointmentCommand command = new ScheduleAppointmentCommand(
             UUID.randomUUID(), UUID.randomUUID(), start, start.plusMinutes(30), "Checkup");
+
+    @Test
+    void identifierAndAuditComeFromPortsAndTheVerifiedActor() {
+        Appointment result = schedule(command);
+        assertEquals(GENERATED, result.id());
+        assertEquals(NOW, result.createdAt());
+        assertEquals(context.actorUserId(), result.createdBy());
+        assertEquals(context.actorUserId(), result.updatedBy());
+    }
+
+    @Test
+    void pastStartIsRejectedAgainstTheServerClockBeforeAnyRegistration() {
+        var past = OffsetDateTime.parse("2026-10-30T09:00:00-05:00");
+        var invalid = new ScheduleAppointmentCommand(UUID.randomUUID(), UUID.randomUUID(), past,
+                past.plusMinutes(30), "Checkup");
+        assertEquals("startAt", assertThrows(InvalidAppointmentException.class, () -> schedule(invalid)).field());
+        assertEquals(0, ports.registrations);
+    }
 
     @Test
     void schedulesAndRegistersTheValidatedAppointment() {
@@ -91,7 +115,7 @@ class ScheduleAppointmentUseCaseTest {
 
     private SchedulingResult originalResult() {
         return new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), start, command.endAt(), command.reason()), 7);
+                command.dentistId(), start, command.endAt(), command.reason(), context.actorUserId(), NOW), 7);
     }
 
     private void assertDefinitiveRecovery() {
@@ -108,7 +132,7 @@ class ScheduleAppointmentUseCaseTest {
     @Test
     void returnsAuthoritativeRegistrationResultWithDifferentIdentifier() {
         ports.result = new SchedulingResult(Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), command.startAt(), command.endAt(), command.reason()), 7);
+                command.dentistId(), command.startAt(), command.endAt(), command.reason(), context.actorUserId(), NOW), 7);
         SchedulingResult result = useCase.schedule(command, context);
         assertSame(ports.result, result);
         assertEquals(7, result.version());
@@ -118,10 +142,13 @@ class ScheduleAppointmentUseCaseTest {
 
     @Test
     void requiresAllConstructorDependencies() {
-        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(null, ports, ports, ports));
-        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, null, ports, ports));
-        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, null, ports));
-        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, ports, null));
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(null, ports, ports, ports, () -> GENERATED, clock));
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, null, ports, ports, () -> GENERATED, clock));
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, null, ports, () -> GENERATED, clock));
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, ports, null, () -> GENERATED, clock));
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, ports, ports, null, clock));
+        assertThrows(NullPointerException.class, () -> new ScheduleAppointmentUseCase(ports, ports, ports, ports, () -> GENERATED, null));
     }
 
     @Test
