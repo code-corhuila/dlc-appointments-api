@@ -1,6 +1,8 @@
 package co.edu.corhuila.dlc.appointments.adapter.out.persistence;
 
+import co.edu.corhuila.dlc.appointments.application.model.AppointmentPage;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentReader;
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentSearch;
 import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentSnapshot;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentStatus;
@@ -12,6 +14,8 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +26,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * appointments.appointments with an explicit row-to-aggregate mapping. Instants are stored and read in UTC.
  * The GiST exclusion (SQLSTATE 23P01) is the atomic APT-002 guard and surfaces as SLOT_UNAVAILABLE.
  */
-public final class JdbcAppointmentRepository implements AppointmentReader {
+public final class JdbcAppointmentRepository implements AppointmentReader, AppointmentSearch {
     private static final String EXCLUSION_VIOLATION = "23P01";
     private final JdbcClient jdbc;
     private final String clinicTimezone;
@@ -62,6 +66,41 @@ public final class JdbcAppointmentRepository implements AppointmentReader {
                 .param(id)
                 .query((row, n) -> Appointment.reconstitute(snapshot(row)))
                 .optional();
+    }
+
+    /** Filters on startAt (from inclusive, to exclusive); most recent first with id as the stable tie-break. */
+    @Override
+    public AppointmentPage search(Criteria criteria) {
+        StringBuilder where = new StringBuilder(" WHERE status IN (:statuses)");
+        Map<String, Object> params = new HashMap<>();
+        params.put("statuses", criteria.statuses().stream().map(Enum::name).toList());
+        if (criteria.patientId() != null) {
+            where.append(" AND patient_id = :patient");
+            params.put("patient", criteria.patientId());
+        }
+        if (criteria.dentistId() != null) {
+            where.append(" AND dentist_id = :dentist");
+            params.put("dentist", criteria.dentistId());
+        }
+        if (criteria.from() != null) {
+            where.append(" AND start_at >= CAST(:from AS timestamptz)");
+            params.put("from", utc(criteria.from()));
+        }
+        if (criteria.to() != null) {
+            where.append(" AND start_at < CAST(:to AS timestamptz)");
+            params.put("to", utc(criteria.to()));
+        }
+        long total = jdbc.sql("SELECT count(*) FROM appointments.appointments" + where).params(params)
+                .query(Long.class).single();
+        params.put("limit", criteria.limit());
+        params.put("offset", (long) (criteria.page() - 1) * criteria.limit());
+        var items = jdbc.sql("""
+                SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,
+                       reminder_status, version, created_at, created_by, updated_at, updated_by
+                FROM appointments.appointments""" + where
+                + " ORDER BY created_at DESC, appointment_id DESC LIMIT :limit OFFSET :offset")
+                .params(params).query((row, n) -> Appointment.reconstitute(snapshot(row))).list();
+        return new AppointmentPage(items, criteria.page(), criteria.limit(), total);
     }
 
     private static AppointmentSnapshot snapshot(ResultSet row) throws SQLException {
