@@ -5,13 +5,14 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointmentC
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentRegistration;
+import co.edu.corhuila.dlc.appointments.application.port.out.IdGenerator;
 import co.edu.corhuila.dlc.appointments.application.port.out.SchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingResult;
 import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException.Reason;
-import java.util.UUID;
+import java.time.Clock;
 import java.util.Objects;
 import static co.edu.corhuila.dlc.appointments.domain.model.SchedulingException.Reason.*;
 
@@ -21,14 +22,18 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
     private final AppointmentAvailability availability;
     private final AppointmentRegistration registration;
     private final SchedulingAuthorization authorization;
+    private final IdGenerator ids;
+    private final Clock clock;
 
     public ScheduleAppointmentUseCase(AppointmentEligibility eligibility,
             AppointmentAvailability availability, AppointmentRegistration registration,
-            SchedulingAuthorization authorization) {
+            SchedulingAuthorization authorization, IdGenerator ids, Clock clock) {
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
         this.availability = Objects.requireNonNull(availability, "availability");
         this.registration = Objects.requireNonNull(registration, "registration");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.ids = Objects.requireNonNull(ids, "ids");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -36,8 +41,9 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
         Objects.requireNonNull(context, "context");
         authorization.requireSchedulingAllowed(context.actorUserId(), context.sessionId());
         Objects.requireNonNull(command, "command");
-        Appointment proposed = Appointment.schedule(UUID.randomUUID(), command.patientId(),
-                command.dentistId(), command.startAt(), command.endAt(), command.reason());
+        Appointment proposed = Appointment.schedule(ids.newId(), command.patientId(),
+                command.dentistId(), command.startAt(), command.endAt(), command.reason(),
+                context.actorUserId(), clock.instant());
         var recovered = registration.recover(context, proposed);
         if (recovered.isPresent()) return recovered.get();
         return registration.register(context, proposed, () -> validateNewAppointment(proposed));
