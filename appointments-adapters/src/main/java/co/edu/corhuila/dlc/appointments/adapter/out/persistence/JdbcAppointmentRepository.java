@@ -1,5 +1,6 @@
 package co.edu.corhuila.dlc.appointments.adapter.out.persistence;
 
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentReader;
 import co.edu.corhuila.dlc.appointments.domain.model.Appointment;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentSnapshot;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentStatus;
@@ -21,7 +22,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * appointments.appointments with an explicit row-to-aggregate mapping. Instants are stored and read in UTC.
  * The GiST exclusion (SQLSTATE 23P01) is the atomic APT-002 guard and surfaces as SLOT_UNAVAILABLE.
  */
-public final class JdbcAppointmentRepository {
+public final class JdbcAppointmentRepository implements AppointmentReader {
     private static final String EXCLUSION_VIOLATION = "23P01";
     private final JdbcClient jdbc;
     private final String clinicTimezone;
@@ -52,6 +53,7 @@ public final class JdbcAppointmentRepository {
         }
     }
 
+    @Override
     public Optional<Appointment> findById(UUID id) {
         return jdbc.sql("""
                 SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,

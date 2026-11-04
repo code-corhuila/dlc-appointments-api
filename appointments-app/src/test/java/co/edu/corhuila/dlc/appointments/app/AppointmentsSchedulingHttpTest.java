@@ -125,6 +125,29 @@ class AppointmentsSchedulingHttpTest {
                 .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"));
     }
 
+    @Test
+    void readReturnsTheRepresentationWithinTheReadersScope() throws Exception {
+        String created = schedule(body(TestIdentity.ACTIVE_PATIENT, openDay(), "11:00"), "key-" + UUID.randomUUID())
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String id = new ObjectMapper().readTree(created).get("id").asText();
+
+        read(id, TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.status").value("PROGRAMADA"));
+        read(id, TestIdentity.bearer(TestIdentity.DENTIST, "DENTIST"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.dentistId").value(TestIdentity.DENTIST));
+        read(id, TestIdentity.bearer(UUID.randomUUID().toString(), "DENTIST"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.error").value("NOT_FOUND"));
+        read(UUID.randomUUID().toString(), TestIdentity.bearer(TestIdentity.SECRETARY, "ADMINISTRATOR"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.error").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.traceId").isString());
+    }
+
+    private ResultActions read(String id, String bearer) throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/v1/appointments/" + id).header("Authorization", bearer));
+    }
+
     private ResultActions schedule(String body, String key) throws Exception {
         return mvc.perform(post("/api/v1/appointments").contentType("application/json").content(body)
                 .header("Idempotency-Key", key)

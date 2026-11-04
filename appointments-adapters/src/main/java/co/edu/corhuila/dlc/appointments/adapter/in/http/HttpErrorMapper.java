@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
+import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -17,6 +18,9 @@ public final class HttpErrorMapper {
     public static ResponseEntity<ApiError> map(Exception failure, String trustedTraceId) {
         if (failure instanceof RequestValidationException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.details(), trustedTraceId);
+        }
+        if (failure instanceof AppointmentNotFoundException) {
+            return response(404, "NOT_FOUND", "The resource does not exist.", null, trustedTraceId);
         }
         if (failure instanceof InvalidAppointmentException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.",

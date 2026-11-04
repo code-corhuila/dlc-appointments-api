@@ -16,7 +16,9 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
+import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
+import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -96,6 +98,12 @@ public class AppointmentsConfiguration {
         return new ScheduleAppointmentUseCase(eligibility, new JdbcAppointmentAvailability(jdbc),
                 new JdbcAppointmentRegistration(transactions, jdbc, appointments, keys, outbox, UUID::randomUUID),
                 new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC());
+    }
+
+    /** HU-APT-003: scoped read of the authoritative appointment. */
+    @Bean
+    ReadAppointment readAppointment(JdbcAppointmentRepository appointments) {
+        return new ReadAppointmentUseCase(appointments);
     }
 
     private static AuthSessionValidationClient authSessions(AppointmentsProperties.Auth auth) {

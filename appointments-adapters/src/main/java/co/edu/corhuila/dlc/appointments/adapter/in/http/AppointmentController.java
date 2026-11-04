@@ -4,7 +4,9 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.AppointmentResponse;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.CreateAppointmentRequest;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.AuthenticatedStaff;
+import co.edu.corhuila.dlc.appointments.application.model.ReaderContext;
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
+import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -14,19 +16,30 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HU-APT-001 public operations; authentication already ran in StaffAuthenticationFilter. */
+/** Appointment public operations; authentication already ran in StaffAuthenticationFilter. */
 @RestController
 public class AppointmentController {
     static final String COLLECTION = "/api/v1/appointments";
     private final ScheduleAppointment scheduling;
+    private final ReadAppointment reading;
 
-    public AppointmentController(ScheduleAppointment scheduling) {
+    public AppointmentController(ScheduleAppointment scheduling, ReadAppointment reading) {
         this.scheduling = Objects.requireNonNull(scheduling, "scheduling");
+        this.reading = Objects.requireNonNull(reading, "reading");
+    }
+
+    /** HU-APT-003: 404 for a missing appointment and for one outside the reader's scope alike. */
+    @GetMapping(COLLECTION + "/{id}")
+    public AppointmentResponse read(@PathVariable("id") UUID id, HttpServletRequest request) {
+        var staff = staff(request);
+        return AppointmentResponse.from(reading.read(id, new ReaderContext(staff.userId(), staff.roles())));
     }
 
     /** 201 with Location for a new appointment; 200 with the same appointment for an idempotent retry. */
@@ -63,9 +76,13 @@ public class AppointmentController {
     }
 
     private static SchedulingContext context(HttpServletRequest request, String idempotencyKey) {
-        var staff = (AuthenticatedStaff) request.getAttribute(AuthenticatedStaff.ATTRIBUTE);
+        var staff = staff(request);
         return new SchedulingContext(staff.userId(), staff.sessionId(), idempotencyKey, staff.roles(),
                 correlationUuid(request));
+    }
+
+    private static AuthenticatedStaff staff(HttpServletRequest request) {
+        return (AuthenticatedStaff) request.getAttribute(AuthenticatedStaff.ATTRIBUTE);
     }
 
     /** Event and audit metadata need a UUID; a non-UUID correlation ID maps to a stable name-based UUID. */
