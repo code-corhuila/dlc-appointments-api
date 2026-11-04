@@ -17,7 +17,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Due reminders are locked with SKIP LOCKED, so concurrent instances never request the same one. Only PENDING
  * rows of PROGRAMADA/CONFIRMADA appointments whose start is still ahead qualify; late delivery after the start
- * stays an open policy decision and is never attempted.
+ * stays an open policy decision and is never attempted. The event carries the delivery id the worker reports
+ * its outcome with (D11).
  */
 public final class JdbcReminderRequests implements ReminderRequests {
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -55,15 +56,17 @@ public final class JdbcReminderRequests implements ReminderRequests {
                     .list();
             UUID run = ids.newId();
             for (Due reminder : due) {
+                UUID delivery = ids.newId();
                 jdbc.sql("""
                         UPDATE appointments.appointment_reminders SET status = 'REQUESTED', delivery_id = ?, updated_at = ?
                         WHERE reminder_id = ?""")
-                        .params(ids.newId(), at, reminder.reminderId()).update();
+                        .params(delivery, at, reminder.reminderId()).update();
                 var payload = new LinkedHashMap<String, Object>();
                 payload.put("appointmentId", reminder.appointmentId());
                 payload.put("patientId", reminder.patientId());
                 payload.put("startAt", reminder.startAt().toInstant().toString());
                 payload.put("appointmentVersion", reminder.version());
+                payload.put("deliveryId", delivery);
                 payload.put("requestedAt", now.toString());
                 outbox.append(new OutboxEvent(ids.newId(), "AppointmentReminderRequested", 1, "Appointment",
                         reminder.appointmentId(), json(payload), run, null, null, now));

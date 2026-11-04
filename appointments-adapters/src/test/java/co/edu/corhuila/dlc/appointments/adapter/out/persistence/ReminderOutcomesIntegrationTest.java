@@ -126,13 +126,21 @@ class ReminderOutcomesIntegrationTest {
     /** A live appointment a few hours ahead whose reminder was requested by the scheduler. */
     private static Appointment requested() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-        OffsetDateTime start = now.plus(2, ChronoUnit.HOURS).plusSeconds((long) (Math.random() * 100_000))
+        OffsetDateTime start = now.plus(2, ChronoUnit.HOURS).plusSeconds((long) (Math.random() * 36_000))
                 .atOffset(ZoneOffset.ofHours(-5));
         Appointment proposed = Appointment.schedule(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), start,
                 start.plusMinutes(30), "Checkup", UUID.randomUUID(), now);
         Appointment a = registration.register(context(), proposed, () -> { }).appointment();
-        requests.requestDue(now, 1000);
+        // The shared test database accumulates due reminders across runs: pass until this one is requested.
+        for (int pass = 0; pass < 50 && !isRequested(a); pass++) {
+            requests.requestDue(now, 1000);
+        }
         return a;
+    }
+
+    private static boolean isRequested(Appointment a) {
+        return jdbc.sql("SELECT count(*) FROM appointments.appointment_reminders WHERE appointment_id = ? "
+                + "AND delivery_id IS NOT NULL").param(a.id()).query(Long.class).single() == 1;
     }
 
     private static UUID deliveryOf(Appointment a) {

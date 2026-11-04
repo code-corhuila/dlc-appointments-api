@@ -59,11 +59,13 @@ class ReminderRequestsIntegrationTest {
         assertEquals("REQUESTED", row.get("status"));
         assertNotNull(row.get("delivery_id"));
         Map<String, Object> event = jdbc.sql("SELECT payload->>'patientId' AS patient, payload->>'appointmentVersion' "
-                + "AS version, payload->>'startAt' AS start, correlation_id FROM appointments.outbox_events "
+                + "AS version, payload->>'startAt' AS start, payload->>'deliveryId' AS delivery, correlation_id "
+                + "FROM appointments.outbox_events "
                 + "WHERE aggregate_id = ? AND event_type = 'AppointmentReminderRequested'").param(a.id()).query()
                 .singleRow();
         assertEquals(a.patientId().toString(), event.get("patient"));
         assertEquals("1", event.get("version"));
+        assertEquals(row.get("delivery_id").toString(), event.get("delivery"));
         assertEquals(a.startAt().toInstant(), OffsetDateTime.parse((String) event.get("start")).toInstant());
 
         reminders.requestDue(now.plusSeconds(1), 500);
