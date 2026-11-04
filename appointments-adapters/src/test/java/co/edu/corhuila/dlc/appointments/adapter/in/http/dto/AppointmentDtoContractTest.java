@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -25,6 +26,8 @@ class AppointmentDtoContractTest {
     private static final UUID DENTIST = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final OffsetDateTime START = OffsetDateTime.parse("2026-11-01T09:00:00-05:00");
     private static final OffsetDateTime END = START.plusMinutes(30);
+    private static final UUID ACTOR = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
     // Explicit test configuration; this does not configure Spring MVC's production mapper.
     private final JsonMapper json = JsonMapper.builder().addModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -90,7 +93,7 @@ class AppointmentDtoContractTest {
 
     @Test
     void responseExplicitlyMapsAuthoritativeAppointmentAndOriginalVersion() {
-        var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup");
+        var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
         var response = AppointmentResponse.from(new SchedulingResult(appointment, 7));
         assertEquals(ID, response.id());
         assertEquals(PATIENT, response.patientId());
@@ -105,7 +108,7 @@ class AppointmentDtoContractTest {
 
     @Test
     void responseJsonIsFlatAndContainsOnlyRequiredAndDerivableFields() throws Exception {
-        var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup");
+        var appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
         JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(new SchedulingResult(appointment, 7))));
         assertEquals(Set.of("id", "patientId", "dentistId", "startAt", "endAt", "status", "version",
                 "reason", "reminderDueAt"), fields(tree));
@@ -121,7 +124,7 @@ class AppointmentDtoContractTest {
 
     private Appointment appointment(ScheduleAppointmentCommand command) {
         return Appointment.schedule(ID, command.patientId(), command.dentistId(),
-                command.startAt(), command.endAt(), command.reason());
+                command.startAt(), command.endAt(), command.reason(), ACTOR, NOW);
     }
 
     private Set<String> fields(JsonNode tree) {
