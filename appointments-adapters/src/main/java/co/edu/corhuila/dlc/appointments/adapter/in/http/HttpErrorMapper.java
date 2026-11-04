@@ -1,9 +1,11 @@
 package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
+import co.edu.corhuila.dlc.appointments.domain.model.AppointmentConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.AppointmentNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.DentistNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAvailabilityException;
+import co.edu.corhuila.dlc.appointments.domain.model.InvalidStatusTransitionException;
 import co.edu.corhuila.dlc.appointments.domain.model.StaleVersionException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
@@ -32,6 +34,15 @@ public final class HttpErrorMapper {
         if (failure instanceof StaleVersionException) {
             return response(409, "STALE_VERSION", "The resource has changed. Reload it before submitting again.",
                     null, trustedTraceId);
+        }
+        if (failure instanceof InvalidStatusTransitionException) {
+            return response(422, "INVALID_STATUS_TRANSITION", "The current state does not allow this transition.",
+                    null, trustedTraceId);
+        }
+        if (failure instanceof AppointmentConflictException) {
+            return response(409, "APPOINTMENT_CONFLICT",
+                    "The requested change conflicts with the 24-hour rule or the appointment timing.", null,
+                    trustedTraceId);
         }
         if (failure instanceof InvalidAppointmentException invalid) {
             return response(400, "VALIDATION_ERROR", "The request is invalid.",
