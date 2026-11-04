@@ -101,6 +101,36 @@ class LifecycleHttpTest {
     }
 
     @Test
+    void reschedulingMovesTheAppointmentBackToProgramadaWithinTheDentistAvailability() throws Exception {
+        OffsetDateTime start = farStart();
+        String id = book(start);
+        call(id, "confirmations", "{\"expectedVersion\":1,\"channel\":\"PHONE\"}", secretary())
+                .andExpect(status().isOk());
+        OffsetDateTime shifted = start.plusMinutes(15);
+        call(id, "reschedulings", reschedule(2, shifted, "Overlaps only itself"), secretary())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROGRAMADA"))
+                .andExpect(jsonPath("$.confirmationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.startAt").value(shifted.toInstant().toString()))
+                .andExpect(jsonPath("$.version").value(3));
+        call(id, "reschedulings", reschedule(3, start.plusHours(5), "Outside availability"), secretary())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("APPOINTMENT_CONFLICT"));
+        call(id, "reschedulings", reschedule(3, shifted, "Same interval"), secretary())
+                .andExpect(status().isBadRequest());
+        call(id, "reschedulings", "{\"expectedVersion\":3}", secretary())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[?(@.field == 'startAt')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'endAt')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'reason')]").exists());
+    }
+
+    private static String reschedule(long version, OffsetDateTime start, String reason) {
+        return "{\"expectedVersion\":" + version + ",\"startAt\":\"" + start + "\",\"endAt\":\""
+                + start.plusMinutes(30) + "\",\"reason\":\"" + reason + "\"}";
+    }
+
+    @Test
     void dentistUnknownAppointmentAndInvalidRequestsAreRejected() throws Exception {
         String id = book(farStart());
         call(id, "confirmations", "{\"expectedVersion\":1,\"channel\":\"PHONE\"}",

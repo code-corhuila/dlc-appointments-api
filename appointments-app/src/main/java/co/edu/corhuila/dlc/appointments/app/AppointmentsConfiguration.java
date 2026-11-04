@@ -140,8 +140,8 @@ public class AppointmentsConfiguration {
             JdbcAppointmentRepository appointments, JdbcIdempotencyStore keys, JdbcOutboxWriter outbox,
             AppointmentEligibility eligibility) {
         return new ChangeAppointmentStatusUseCase(new JdbcAppointmentLifecycleStore(transactions, jdbc, appointments,
-                keys, outbox, UUID::randomUUID), appointments, eligibility, new RoleSchedulingAuthorization(),
-                Clock.systemUTC());
+                keys, outbox, UUID::randomUUID), appointments, eligibility, new JdbcAppointmentAvailability(jdbc),
+                new RoleSchedulingAuthorization(), Clock.systemUTC());
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */

@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http.dto;
 
 import co.edu.corhuila.dlc.appointments.application.port.in.LifecycleCommand;
 import co.edu.corhuila.dlc.appointments.domain.model.ConfirmationChannel;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +33,21 @@ public final class LifecycleRequests {
 
         public LifecycleCommand toCommand(UUID id) {
             return new LifecycleCommand.Cancel(id, expectedVersion, reason, Boolean.TRUE.equals(override));
+        }
+    }
+
+    public record Reschedule(Long expectedVersion, OffsetDateTime startAt, OffsetDateTime endAt, String reason,
+            Boolean override) {
+        public List<ApiError.Detail> missing() {
+            var details = version(expectedVersion);
+            if (startAt == null) details.add(new ApiError.Detail("startAt", "Required RFC 3339 timestamp with offset."));
+            if (endAt == null) details.add(new ApiError.Detail("endAt", "Required RFC 3339 timestamp with offset."));
+            return requireReason(details, reason);
+        }
+
+        public LifecycleCommand toCommand(UUID id) {
+            return new LifecycleCommand.Reschedule(id, expectedVersion, startAt, endAt, reason,
+                    Boolean.TRUE.equals(override));
         }
     }
 

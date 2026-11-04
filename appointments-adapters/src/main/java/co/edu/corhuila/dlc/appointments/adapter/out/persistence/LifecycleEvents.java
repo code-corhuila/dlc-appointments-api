@@ -35,6 +35,17 @@ final class LifecycleEvents {
                 payload.put("override", transition.change().override());
                 yield "AppointmentCancelled";
             }
+            case LifecycleCommand.Reschedule r -> {
+                payload.remove("patientId");
+                payload.put("previousStartAt", transition.change().previousStartAt().toInstant().toString());
+                payload.put("newStartAt", a.startAt().toInstant().toString());
+                payload.put("newEndAt", a.endAt().toInstant().toString());
+                payload.put("newReminderDueAt", a.reminderDueAt().toInstant().toString());
+                payload.put("appointmentVersion", a.version());
+                payload.put("rescheduledBy", actor);
+                if (transition.change().override()) payload.put("overrideReason", transition.change().reason());
+                yield "AppointmentRescheduled";
+            }
             case LifecycleCommand.StartAttention s -> {
                 payload.put("dentistId", a.dentistId());
                 payload.put("startedAt", at);
