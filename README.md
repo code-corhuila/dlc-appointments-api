@@ -86,6 +86,8 @@ Database and broker tests are skipped unless these are set:
 | `TEST_RABBITMQ_URL` | A disposable RabbitMQ (`amqp://user:password@host:5672`) |
 | `DLC_DOCS_DIR` | Path of a dlc-docs checkout. Every HTTP test response is then validated against `07-api/contracts/openapi/appointments-service.yaml` or `internal-coordination.yaml`, read in place |
 
+Coverage (JaCoCo) is reported on every build: per module in `target/site/jacoco`, and for the whole service, counting every module's tests, in `appointments-app/target/site/jacoco-aggregate`. With the variables above set, `mvn -B verify -Pcoverage` fails when a module drops below its baseline (`coverage.line.minimum` and `coverage.branch.minimum` in each module's `pom.xml`).
+
 ## Run with Docker Compose
 
 Requirements:
