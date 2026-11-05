@@ -1,49 +1,55 @@
+# Service only: the database lives in dlc-infra-postgres (schema and runtime role from dlc-appointments-db).
+# The broker profile starts a RabbitMQ on the same network for stages that have none yet.
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: dlc-appointments-postgres
+  appointments-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: dlc-appointments-api:local
     restart: unless-stopped
-
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-
+    stop_grace_period: 30s
+    env_file: ../.env
     volumes:
-      - appointments_postgres_data:/var/lib/postgresql/data
-
+      # Service tokens and public keys referenced by the *_FILE variables of .env.
+      - type: bind
+        source: ${APPOINTMENTS_SECRETS_DIR:?set APPOINTMENTS_SECRETS_DIR}
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "${SERVER_PORT:-8080}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      # The JRE image has no curl; bash (not dash) provides /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/${SERVER_PORT:-8080} && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    networks: [platform]
 
   rabbitmq:
+    profiles: [broker]
     image: rabbitmq:3.13-management-alpine
-    container_name: dlc-appointments-rabbitmq
+    container_name: dlc-rabbitmq
     restart: unless-stopped
-
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-
-    ports:
-      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?set RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS}
     volumes:
-      - appointments_rabbitmq_data:/var/lib/rabbitmq
-
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks: [platform]
 
 volumes:
-  appointments_postgres_data:
-  appointments_rabbitmq_data:
+  rabbitmq_data:
+
+networks:
+  platform:
+    name: ${PLATFORM_NETWORK:-platform}
+    external: true
