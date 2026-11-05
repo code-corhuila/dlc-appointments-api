@@ -1,0 +1,15 @@
+# Optional Swagger UI for dev and qa: add this file after compose.yml. It mounts the OpenAPI contracts of a dlc-docs
+# checkout read-only, enables /docs and publishes the API on the loopback interface only. Never use it in production.
+services:
+  appointments-api:
+    environment:
+      APPOINTMENTS_API_DOCS_DIR: /opt/dlc-contracts
+    volumes:
+      - type: bind
+        source: ${DLC_DOCS_DIR:?set DLC_DOCS_DIR to a dlc-docs checkout}/07-api/contracts/openapi
+        target: /opt/dlc-contracts
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:${APPOINTMENTS_DOCS_PORT:-8090}:${SERVER_PORT:-8080}"
