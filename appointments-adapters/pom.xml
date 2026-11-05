@@ -34,6 +34,12 @@
             <artifactId>spring-security-oauth2-jose</artifactId>
         </dependency>
 
+        <!-- Outbox relay to RabbitMQ; plain spring-rabbit, no Boot auto-configuration. -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>co.edu.corhuila.dlc</groupId>
             <artifactId>appointments-core</artifactId>
