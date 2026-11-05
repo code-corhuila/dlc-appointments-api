@@ -3,6 +3,7 @@ package co.edu.corhuila.dlc.appointments.application.usecase;
 import co.edu.corhuila.dlc.appointments.application.model.SchedulingContext;
 import co.edu.corhuila.dlc.appointments.application.port.in.ChangeAppointmentStatus;
 import co.edu.corhuila.dlc.appointments.application.port.in.LifecycleCommand;
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentLifecycleStore;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentReader;
@@ -20,19 +21,25 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-/** HU-APT-002 orchestration: staff authorization, owner checks, then one atomic decision in the store. */
+/**
+ * HU-APT-002 orchestration: staff authorization, owner checks (active patient for attention starts and
+ * reschedules), then one atomic decision in the store, which for a reschedule also rechecks availability.
+ */
 public final class ChangeAppointmentStatusUseCase implements ChangeAppointmentStatus {
     private final AppointmentLifecycleStore store;
     private final AppointmentReader reader;
     private final AppointmentEligibility eligibility;
+    private final AppointmentAvailability availability;
     private final SchedulingAuthorization authorization;
     private final Clock clock;
 
     public ChangeAppointmentStatusUseCase(AppointmentLifecycleStore store, AppointmentReader reader,
-            AppointmentEligibility eligibility, SchedulingAuthorization authorization, Clock clock) {
+            AppointmentEligibility eligibility, AppointmentAvailability availability,
+            SchedulingAuthorization authorization, Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
         this.reader = Objects.requireNonNull(reader, "reader");
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
+        this.availability = Objects.requireNonNull(availability, "availability");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -42,7 +49,7 @@ public final class ChangeAppointmentStatusUseCase implements ChangeAppointmentSt
         Objects.requireNonNull(context, "context");
         authorization.requireSchedulingAllowed(context);
         Objects.requireNonNull(command, "command");
-        if (command instanceof LifecycleCommand.StartAttention) {
+        if (command instanceof LifecycleCommand.StartAttention || command instanceof LifecycleCommand.Reschedule) {
             Appointment current = reader.findById(command.appointmentId())
                     .orElseThrow(AppointmentNotFoundException::new);
             if (!eligibility.isPatientActive(current.patientId())) {
@@ -66,8 +73,19 @@ public final class ChangeAppointmentStatusUseCase implements ChangeAppointmentSt
         return Optional.of(switch (command) {
             case LifecycleCommand.Confirm c -> current.confirm(c.channel(), actor, now);
             case LifecycleCommand.Cancel c -> current.cancel(c.reason(), c.override(), role, actor, now);
+            case LifecycleCommand.Reschedule r -> moved(current.reschedule(r.startAt(), r.endAt(), r.reason(),
+                    r.override(), role, actor, now));
             case LifecycleCommand.StartAttention s -> current.startAttention(actor, now);
             case LifecycleCommand.NoShow n -> current.markNoShow(n.reason(), actor, now);
         });
+    }
+
+    /** Inside the store's transaction, after the state machine accepted the move (APT-002 for the new interval). */
+    private Transition moved(Transition transition) {
+        Appointment next = transition.appointment();
+        if (!availability.isAvailable(next.dentistId(), next.startAt(), next.endAt(), next.id())) {
+            throw new SchedulingException(SchedulingException.Reason.SLOT_UNAVAILABLE);
+        }
+        return transition;
     }
 }

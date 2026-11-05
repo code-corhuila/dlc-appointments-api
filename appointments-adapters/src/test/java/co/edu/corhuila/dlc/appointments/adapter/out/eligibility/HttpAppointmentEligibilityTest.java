@@ -161,6 +161,19 @@ class HttpAppointmentEligibilityTest {
         }
     }
 
+    /** A transport timeout can surface as an unchecked CancellationException; it must still fail closed. */
+    @Test
+    void uncheckedTransportFailureFailsClosed() {
+        org.springframework.http.client.ClientHttpRequestFactory cancelling = (uri, method) -> {
+            throw new java.util.concurrent.CancellationException();
+        };
+        URI origin = URI.create("http://localhost:1");
+        var failing = new HttpAppointmentEligibility(RestClient.builder().requestFactory(cancelling).build(),
+                origin, () -> "to-patients", origin, () -> "to-auth");
+        assertUnavailable(() -> failing.isPatientActive(PATIENT));
+        assertUnavailable(() -> failing.isDentistAuthorized(PATIENT));
+    }
+
     private static void assertUnavailable(Runnable call) {
         assertEquals(SchedulingException.Reason.DEPENDENCY_UNAVAILABLE,
                 assertThrows(SchedulingException.class, call::run).reason());
