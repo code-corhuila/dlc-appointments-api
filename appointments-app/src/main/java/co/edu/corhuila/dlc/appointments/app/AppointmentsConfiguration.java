@@ -5,6 +5,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcEventInbox;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcPatientGuardStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderOutcomes;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderRequests;
@@ -20,6 +21,8 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffJwtSignatu
 import co.edu.corhuila.dlc.appointments.adapter.out.auth.AuthSessionValidationClient;
 import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleSchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
+import co.edu.corhuila.dlc.appointments.adapter.in.messaging.EventEnvelopeReader;
+import co.edu.corhuila.dlc.appointments.adapter.in.messaging.RabbitEventConsumer;
 import co.edu.corhuila.dlc.appointments.adapter.out.messaging.JdbcOutboxRelay;
 import co.edu.corhuila.dlc.appointments.adapter.out.messaging.RabbitEventPublisher;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
@@ -44,6 +47,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import co.edu.corhuila.dlc.appointments.application.usecase.ChangeAppointmentStatusUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ClinicalAssignmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.InternalRelationshipReads;
+import co.edu.corhuila.dlc.appointments.application.usecase.ConsumeEvent;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.PatientGuards;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
@@ -53,6 +57,8 @@ import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -216,6 +222,25 @@ public class AppointmentsConfiguration {
                 messaging.exchange(), Duration.ofSeconds(5));
         return new RelayOutbox(new JdbcOutboxRelay(transactions, jdbc, publisher), Clock.systemUTC(),
                 messaging.relayBatchSize());
+    }
+
+    /** ClinicalCareCompleted (D8) and PatientDeactivated (D9) through the inbox; acknowledged after commit. */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "appointments.messaging.consumers-enabled", havingValue = "true", matchIfMissing = true)
+    SimpleMessageListenerContainer eventConsumers(TransactionTemplate transactions, JdbcClient jdbc,
+            AppointmentsProperties properties) {
+        var messaging = properties.messaging();
+        if (messaging == null || messaging.rabbitmqUri() == null || messaging.rabbitmqUri().getHost() == null) {
+            throw new IllegalStateException("APPOINTMENTS_RABBITMQ_URI must be an absolute amqp URI.");
+        }
+        var connections = new CachingConnectionFactory(messaging.rabbitmqUri());
+        connections.setConnectionTimeout(5000);
+        var topology = new RabbitEventConsumer.Topology(messaging.clinicalExchange(), messaging.patientsExchange(),
+                "appointments");
+        return new RabbitEventConsumer(connections, topology,
+                new ConsumeEvent(new JdbcEventInbox(transactions, jdbc), Clock.systemUTC()),
+                new EventEnvelopeReader(), messaging.consumerAttempts(), messaging.consumerBackoff()).container();
     }
 
     /** #17 ADR-017 guards for Patients and Clinical, serialized on the patient gate. */

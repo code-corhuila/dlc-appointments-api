@@ -50,6 +50,7 @@ final class TestIdentity {
         // HTTP tests assert exact reminder rows; the periodic pass is exercised by its own tests.
         registry.add("appointments.reminders.enabled", () -> "false");
         registry.add("appointments.messaging.relay-enabled", () -> "false");
+        registry.add("appointments.messaging.consumers-enabled", () -> "false");
         registry.add("appointments.internal.jwt-audience", () -> SERVICE_AUDIENCE);
         registry.add("appointments.auth.internal-url",
                 () -> "http://localhost:" + AUTH.getAddress().getPort());
