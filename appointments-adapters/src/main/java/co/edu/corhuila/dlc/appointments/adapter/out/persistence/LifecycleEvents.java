@@ -51,6 +51,11 @@ final class LifecycleEvents {
                 payload.put("startedAt", at);
                 yield "AppointmentAttentionStarted";
             }
+            case LifecycleCommand.Complete c -> {
+                payload.put("dentistId", a.dentistId());
+                payload.put("completedAt", at);
+                yield "AppointmentCompleted";
+            }
             case LifecycleCommand.NoShow n -> {
                 payload.put("dentistId", a.dentistId());
                 payload.put("recordedAt", at);

@@ -5,6 +5,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcReminderRequests;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -19,6 +20,7 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareCompletions;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareRelationships;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcClinicalAssignmentStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
@@ -29,6 +31,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ReadDentistAvailabil
 import co.edu.corhuila.dlc.appointments.application.port.in.ReplaceDentistAvailability;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadDentistAvailabilityUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.RequestDueReminders;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReplaceDentistAvailabilityUseCase;
 import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
@@ -159,7 +162,7 @@ public class AppointmentsConfiguration {
             AppointmentEligibility eligibility) {
         return new ChangeAppointmentStatusUseCase(new JdbcAppointmentLifecycleStore(transactions, jdbc, appointments,
                 keys, outbox, UUID::randomUUID), appointments, eligibility, new JdbcAppointmentAvailability(jdbc),
-                new RoleSchedulingAuthorization(), Clock.systemUTC());
+                new JdbcCareCompletions(jdbc), new RoleSchedulingAuthorization(), Clock.systemUTC());
     }
 
     /** HU-APT-004: ongoing assignments after Patients/Auth eligibility, atomic in PostgreSQL. */
@@ -176,6 +179,14 @@ public class AppointmentsConfiguration {
             JdbcAppointmentRepository appointments, AppointmentEligibility eligibility) {
         return new InternalRelationshipReads(new JdbcCareRelationships(
                 new DataSourceTransactionManager(dataSource), jdbc), appointments, eligibility);
+    }
+
+    /** APT-006: bounded passes over due reminders; several instances never request the same one. */
+    @Bean
+    RequestDueReminders requestDueReminders(TransactionTemplate transactions, JdbcClient jdbc, JdbcOutboxWriter outbox,
+            @org.springframework.beans.factory.annotation.Value("${appointments.reminders.batch-size:100}") int batch) {
+        return new RequestDueReminders(new JdbcReminderRequests(transactions, jdbc, outbox, UUID::randomUUID),
+                Clock.systemUTC(), batch);
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
