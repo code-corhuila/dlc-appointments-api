@@ -17,6 +17,11 @@
 
     <name>appointments-app</name>
 
+    <properties>
+        <coverage.line.minimum>0.66</coverage.line.minimum>
+        <coverage.branch.minimum>0.25</coverage.branch.minimum>
+    </properties>
+
     <dependencies>
 
         <dependency>
@@ -42,10 +47,37 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Contract tests: every HTTP test response is validated against the dlc-docs OpenAPI snapshot. -->
+        <dependency>
+            <groupId>com.atlassian.oai</groupId>
+            <artifactId>swagger-request-validator-mockmvc</artifactId>
+            <version>2.44.1</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
    <build>
     <plugins>
+        <!-- Aggregate coverage of core, adapters and app, counting every module's tests:
+             target/site/jacoco-aggregate. -->
+        <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <id>report-aggregate</id>
+                    <phase>verify</phase>
+                    <goals>
+                        <goal>report-aggregate</goal>
+                    </goals>
+                    <configuration>
+                        <includeCurrentProject>true</includeCurrentProject>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+
         <plugin>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-maven-plugin</artifactId>

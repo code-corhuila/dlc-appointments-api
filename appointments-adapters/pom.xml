@@ -17,6 +17,11 @@
 
     <name>appointments-adapters</name>
 
+    <properties>
+        <coverage.line.minimum>0.68</coverage.line.minimum>
+        <coverage.branch.minimum>0.52</coverage.branch.minimum>
+    </properties>
+
     <dependencies>
 
         <dependency>
