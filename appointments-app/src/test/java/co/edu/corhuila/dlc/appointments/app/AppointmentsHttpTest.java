@@ -30,6 +30,16 @@ class AppointmentsHttpTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private java.util.List<org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCustomizer> customizers;
+
+    @Test
+    void everyHttpTestResponseIsCheckedAgainstTheOpenApiContract() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(ContractValidation.ENABLED, "DLC_DOCS_DIR not set");
+        org.assertj.core.api.Assertions.assertThat(customizers)
+                .anyMatch(c -> c.getClass().getName().startsWith(ContractValidation.class.getName()));
+    }
+
     @DynamicPropertySource
     static void identity(DynamicPropertyRegistry registry) {
         TestIdentity.register(registry);
