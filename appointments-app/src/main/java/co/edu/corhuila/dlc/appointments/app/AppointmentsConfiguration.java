@@ -7,6 +7,7 @@ import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyS
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.RsaPublicKeys;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.ServiceAuthenticationFilter;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.ServiceJwtVerifier;
@@ -18,6 +19,7 @@ import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleScheduling
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentAvailability;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentLifecycleStore;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcCareRelationships;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcClinicalAssignmentStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRegistration;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcDentistAvailabilityStore;
@@ -32,6 +34,7 @@ import co.edu.corhuila.dlc.appointments.application.port.in.ReadAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import co.edu.corhuila.dlc.appointments.application.usecase.ChangeAppointmentStatusUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ClinicalAssignmentsUseCase;
+import co.edu.corhuila.dlc.appointments.application.usecase.InternalRelationshipReads;
 import co.edu.corhuila.dlc.appointments.application.usecase.ListAppointmentsUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCase;
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
@@ -165,6 +168,14 @@ public class AppointmentsConfiguration {
             JdbcIdempotencyStore keys, JdbcOutboxWriter outbox, AppointmentEligibility eligibility) {
         return new ClinicalAssignmentsUseCase(new JdbcClinicalAssignmentStore(transactions, jdbc, keys, outbox,
                 UUID::randomUUID), eligibility, UUID::randomUUID, Clock.systemUTC());
+    }
+
+    /** #16: authoritative relationship and encounter reads for Clinical over /internal/v1. */
+    @Bean
+    InternalRelationshipReads internalRelationshipReads(DataSource dataSource, JdbcClient jdbc,
+            JdbcAppointmentRepository appointments, AppointmentEligibility eligibility) {
+        return new InternalRelationshipReads(new JdbcCareRelationships(
+                new DataSourceTransactionManager(dataSource), jdbc), appointments, eligibility);
     }
 
     /** HU-APT-003: scoped read of the authoritative appointment. */
