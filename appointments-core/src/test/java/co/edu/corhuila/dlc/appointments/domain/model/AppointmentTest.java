@@ -1,5 +1,6 @@
 package co.edu.corhuila.dlc.appointments.domain.model;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -14,10 +15,12 @@ class AppointmentTest {
     private static final UUID DENTIST = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final OffsetDateTime START = OffsetDateTime.parse("2026-11-01T09:00:00-05:00");
     private static final OffsetDateTime END = START.plusMinutes(30);
+    private static final UUID ACTOR = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
 
     @Test
     void schedulesWithContractIdentifiersIntervalReasonAndInitialStatus() {
-        Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup");
+        Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW);
 
         assertAll(
                 () -> assertEquals(ID, appointment.id()),
@@ -45,7 +48,7 @@ class AppointmentTest {
             assertInvalid("reason", ID, PATIENT, DENTIST, START, END, reason);
         }
         for (String reason : new String[]{"x", "x".repeat(500)}) {
-            assertEquals(reason, Appointment.schedule(ID, PATIENT, DENTIST, START, END, reason).reason());
+            assertEquals(reason, Appointment.schedule(ID, PATIENT, DENTIST, START, END, reason, ACTOR, NOW).reason());
         }
     }
 
@@ -56,7 +59,7 @@ class AppointmentTest {
         assertInvalid("endAt", ID, PATIENT, DENTIST, START,
                 OffsetDateTime.parse("2026-11-01T14:00:00Z"), "Checkup");
         Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST, START,
-                OffsetDateTime.parse("2026-11-01T14:30:00Z"), "Checkup");
+                OffsetDateTime.parse("2026-11-01T14:30:00Z"), "Checkup", ACTOR, NOW);
         assertEquals(END.toInstant(), appointment.endAt().toInstant());
     }
 
@@ -64,7 +67,7 @@ class AppointmentTest {
     void apt006DerivesReminderExactly24HoursBeforeStartAcrossDayBoundary() {
         OffsetDateTime start = OffsetDateTime.parse("2026-11-01T00:15:00-05:00");
         Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST,
-                start, start.plusMinutes(30), "Checkup");
+                start, start.plusMinutes(30), "Checkup", ACTOR, NOW);
         assertEquals(OffsetDateTime.parse("2026-10-31T00:15:00-05:00").toInstant(),
                 appointment.reminderDueAt().toInstant());
         assertEquals(java.time.Duration.ofHours(24),
@@ -77,7 +80,7 @@ class AppointmentTest {
         assertEquals(1000, reason.length());
         assertEquals(500, reason.codePointCount(0, reason.length()));
 
-        Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, reason);
+        Appointment appointment = Appointment.schedule(ID, PATIENT, DENTIST, START, END, reason, ACTOR, NOW);
 
         assertEquals(reason, appointment.reason());
     }
@@ -94,7 +97,7 @@ class AppointmentTest {
     private void assertInvalid(String field, UUID id, UUID patient, UUID dentist,
                                OffsetDateTime start, OffsetDateTime end, String reason) {
         InvalidAppointmentException error = assertThrows(InvalidAppointmentException.class,
-                () -> Appointment.schedule(id, patient, dentist, start, end, reason));
+                () -> Appointment.schedule(id, patient, dentist, start, end, reason, ACTOR, NOW));
         assertEquals(field, error.field());
         assertFalse(error.getMessage().isBlank());
     }
