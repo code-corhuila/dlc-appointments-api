@@ -12,8 +12,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AppointmentsProperties(String clinicTimezone, Security security, Internal internal, Auth auth,
         Patients patients, Messaging messaging) {
 
-    /** Outbox relay: broker URI with credentials (secret), exchange and bounded batch. */
-    public record Messaging(URI rabbitmqUri, String exchange, int relayBatchSize) { }
+    /**
+     * Broker URI with credentials (secret); outbox relay exchange and batch; consumed producer exchanges and the
+     * bounded consumer retry.
+     */
+    public record Messaging(URI rabbitmqUri, String exchange, int relayBatchSize, String clinicalExchange,
+            String patientsExchange, int consumerAttempts, Duration consumerBackoff) { }
 
     /** Trusted Auth public key (inline PEM or file), issuer and audience of staff access tokens. */
     public record Security(String jwtPublicKey, String jwtPublicKeyFile, String jwtIssuer, String jwtAudience) { }

@@ -50,6 +50,12 @@ appointments:
     relay-batch-size: ${APPOINTMENTS_RELAY_BATCH_SIZE:100}
     rabbitmq-uri: ${APPOINTMENTS_RABBITMQ_URI:}
     exchange: ${APPOINTMENTS_EVENTS_EXCHANGE:appointments.events}
+    # Consumers of ClinicalCareCompleted and PatientDeactivated (inbox, bounded retry, DLQ).
+    consumers-enabled: ${APPOINTMENTS_CONSUMERS_ENABLED:true}
+    clinical-exchange: ${APPOINTMENTS_CLINICAL_EVENTS_EXCHANGE:clinical.events}
+    patients-exchange: ${APPOINTMENTS_PATIENTS_EVENTS_EXCHANGE:patients.events}
+    consumer-attempts: ${APPOINTMENTS_CONSUMER_ATTEMPTS:5}
+    consumer-backoff: ${APPOINTMENTS_CONSUMER_BACKOFF:PT1S}
   internal:
     jwt-public-key: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY:}
     jwt-public-key-file: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY_FILE:}
