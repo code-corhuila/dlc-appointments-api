@@ -66,6 +66,9 @@ appointments:
     service-token: ${AUTH_SERVICE_TOKEN:}
     service-token-file: ${AUTH_SERVICE_TOKEN_FILE:}
     timeout: 2s
+  # Swagger UI at /docs over a dlc-docs checkout's 07-api/contracts/openapi folder; unset disables it (production).
+  api-docs:
+    contracts-dir: ${APPOINTMENTS_API_DOCS_DIR:}
   patients:
     internal-url: ${PATIENTS_INTERNAL_URL:}
     service-token: ${PATIENTS_SERVICE_TOKEN:}
