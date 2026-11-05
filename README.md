@@ -70,6 +70,7 @@ Copy `.env.example` to `.env` and fill it in. Never commit `.env`, tokens, priva
 | `APPOINTMENTS_RELAY_ENABLED`, `_INTERVAL`, `_BATCH_SIZE` | Outbox relay (`true`, `PT2S`, `100`) |
 | `APPOINTMENTS_REMINDERS_ENABLED`, `_INTERVAL`, `_BATCH_SIZE` | Reminder pass (`true`, `PT30S`, `100`) |
 | `APPOINTMENTS_CONSUMERS_ENABLED`, `APPOINTMENTS_CONSUMER_ATTEMPTS`, `APPOINTMENTS_CONSUMER_BACKOFF` | Consumers (`true`, `5`, `PT1S`) |
+| `APPOINTMENTS_API_DOCS_DIR` | Folder `07-api/contracts/openapi` of a dlc-docs checkout. Enables Swagger UI at `/docs`; leave it empty in production |
 | `APPOINTMENTS_SECRETS_DIR`, `PLATFORM_NETWORK` | Docker Compose only: host folder mounted read-only at `/run/secrets`, and the external network |
 
 ## Build and test
@@ -106,6 +107,21 @@ docker compose --env-file .env -f deploy/compose.yml --profile broker up -d --bu
 ```
 
 The image is multi-stage, runs as the non-root user `appointments` and listens on `SERVER_PORT`. The container healthcheck calls `GET /health`. `GET /health/ready` also checks the database.
+
+## API documentation (Swagger UI)
+
+Swagger UI is served at `/docs` only when `APPOINTMENTS_API_DOCS_DIR` is set; without it, `/docs` does not exist. It shows the dlc-docs contracts read in place (contract-first), not a specification generated from the code:
+
+- **Public API (`/api/v1`):** `appointments-service.yaml`.
+- **Internal API (`/internal/v1`):** `internal-coordination.yaml`, which also lists the routes of other owners.
+
+The UI assets are bundled in the image, with no CDN. "Try it out" calls this same service, so each request still needs a valid staff or service token (**Authorize** button).
+
+To run it with Docker Compose in dev or qa, set `DLC_DOCS_DIR` in `.env` to a dlc-docs checkout and add `deploy/compose.docs.yml`. The UI is then at `http://127.0.0.1:8090/docs` (`APPOINTMENTS_DOCS_PORT`), published on the loopback interface only:
+
+```bash
+docker compose --env-file .env -f deploy/compose.yml -f deploy/compose.docs.yml up -d --build
+```
 
 ## Branching
 
