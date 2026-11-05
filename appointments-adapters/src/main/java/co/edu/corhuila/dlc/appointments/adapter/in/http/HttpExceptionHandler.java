@@ -3,6 +3,7 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,7 +28,10 @@ public class HttpExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
         // Preserve Spring MVC's recognized statuses rather than classifying them as unexpected failures.
-        return HttpErrorMapper.forFrameworkStatus(status.value(), trustedTrace(request))
+        var mapped = ex instanceof HttpMessageNotReadableException unreadable
+                ? java.util.Optional.of(HttpErrorMapper.invalidBody(unreadable.getCause(), trustedTrace(request)))
+                : HttpErrorMapper.forFrameworkStatus(status.value(), trustedTrace(request));
+        return mapped
                 .<ResponseEntity<Object>>map(envelope -> {
                     HttpHeaders json = new HttpHeaders();
                     if (headers != null) json.putAll(headers);
