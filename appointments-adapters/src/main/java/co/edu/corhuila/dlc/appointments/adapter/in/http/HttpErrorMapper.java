@@ -7,6 +7,7 @@ import co.edu.corhuila.dlc.appointments.domain.model.ClinicalAssignmentNotFoundE
 import co.edu.corhuila.dlc.appointments.domain.model.DentistNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAvailabilityException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidStatusTransitionException;
+import co.edu.corhuila.dlc.appointments.domain.model.PatientGuardNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.ReminderOutcomeConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.StaleVersionException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
@@ -27,7 +28,8 @@ public final class HttpErrorMapper {
             return response(400, "VALIDATION_ERROR", "The request is invalid.", invalid.details(), trustedTraceId);
         }
         if (failure instanceof AppointmentNotFoundException || failure instanceof DentistNotFoundException
-                || failure instanceof ClinicalAssignmentNotFoundException) {
+                || failure instanceof ClinicalAssignmentNotFoundException
+                || failure instanceof PatientGuardNotFoundException) {
             return response(404, "NOT_FOUND", "The resource does not exist.", null, trustedTraceId);
         }
         if (failure instanceof InvalidAvailabilityException invalid) {
