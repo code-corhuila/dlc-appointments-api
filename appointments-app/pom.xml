@@ -42,6 +42,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Contract tests: every HTTP test response is validated against the dlc-docs OpenAPI snapshot. -->
+        <dependency>
+            <groupId>com.atlassian.oai</groupId>
+            <artifactId>swagger-request-validator-mockmvc</artifactId>
+            <version>2.44.1</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
    <build>
