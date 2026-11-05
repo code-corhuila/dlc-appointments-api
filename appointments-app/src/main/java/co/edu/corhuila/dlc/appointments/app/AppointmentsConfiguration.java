@@ -1,6 +1,12 @@
 package co.edu.corhuila.dlc.appointments.app;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.CorrelationFilter;
+import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
+import javax.sql.DataSource;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.RsaPublicKeys;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthenticationFilter;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthenticationVerifier;
@@ -38,6 +44,32 @@ public class AppointmentsConfiguration {
                 new StaffAuthenticationVerifier(jwt, authSessions(properties.auth()))));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
+    }
+
+    @Bean
+    JdbcClient jdbcClient(DataSource dataSource) {
+        return JdbcClient.create(dataSource);
+    }
+
+    @Bean
+    JdbcAppointmentRepository appointmentRepository(JdbcClient jdbc, AppointmentsProperties properties) {
+        return new JdbcAppointmentRepository(jdbc, properties.clinicTimezone());
+    }
+
+    @Bean
+    JdbcIdempotencyStore idempotencyStore(JdbcClient jdbc) {
+        return new JdbcIdempotencyStore(jdbc);
+    }
+
+    @Bean
+    JdbcOutboxWriter outboxWriter(JdbcClient jdbc) {
+        return new JdbcOutboxWriter(jdbc);
+    }
+
+    /** Readiness checks only this service's own database, within the 5 s connection wait. */
+    @Bean
+    ReadinessProbe readinessProbe(JdbcClient jdbc) {
+        return () -> Integer.valueOf(1).equals(jdbc.sql("SELECT 1").query(Integer.class).single());
     }
 
     /** No redirects and explicit deadlines: Auth answers or the request fails closed with 503. */
