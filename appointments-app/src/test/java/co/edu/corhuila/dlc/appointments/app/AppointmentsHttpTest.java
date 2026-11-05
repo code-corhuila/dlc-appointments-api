@@ -140,6 +140,17 @@ class AppointmentsHttpTest {
     }
 
     @Test
+    void availabilityReplacementRequiresItsFields() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/dentists/" + TestIdentity.DENTIST + "/availability")
+                        .contentType("application/json").content("{\"intervals\":[]}")
+                        .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[?(@.field == 'blockedIntervals')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'expectedVersion')]").exists());
+    }
+
+    @Test
     void malformedAppointmentIdIsAValidationError() throws Exception {
         mvc.perform(get("/api/v1/appointments/not-a-uuid")
                         .header("Authorization", TestIdentity.bearer(TestIdentity.SECRETARY, "SECRETARY_ASSISTANT")))
