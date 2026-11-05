@@ -2,11 +2,13 @@ package co.edu.corhuila.dlc.appointments.adapter.in.http;
 
 import co.edu.corhuila.dlc.appointments.adapter.in.http.dto.ApiError;
 import co.edu.corhuila.dlc.appointments.application.model.AppointmentQuery;
+import co.edu.corhuila.dlc.appointments.application.model.AssignmentQuery;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,6 +19,7 @@ import java.util.UUID;
  */
 final class CalendarQueryParser {
     private static final Set<String> KNOWN = Set.of("page", "limit", "patientId", "dentistId", "from", "to");
+    private static final Set<String> ASSIGNMENT_FILTERS = Set.of("page", "limit", "patientId", "dentistId");
 
     private CalendarQueryParser() { }
 
@@ -35,6 +38,19 @@ final class CalendarQueryParser {
         }
         if (!details.isEmpty()) throw new RequestValidationException(details);
         return new AppointmentQuery(patient, dentist, from, to, page, limit);
+    }
+
+    /** GET /api/v1/clinical-assignments: page, limit and optional patientId/dentistId only. */
+    static AssignmentQuery assignments(Map<String, String[]> parameters) {
+        List<ApiError.Detail> details = new ArrayList<>();
+        parameters.keySet().stream().filter(name -> !ASSIGNMENT_FILTERS.contains(name)).sorted()
+                .forEach(name -> details.add(new ApiError.Detail(name, "Unknown filter.")));
+        int page = integer(parameters, "page", 1, 1, Integer.MAX_VALUE, details);
+        int limit = integer(parameters, "limit", 20, 1, 100, details);
+        UUID patient = uuid(parameters, "patientId", details);
+        UUID dentist = uuid(parameters, "dentistId", details);
+        if (!details.isEmpty()) throw new RequestValidationException(details);
+        return new AssignmentQuery(page, limit, Optional.ofNullable(patient), Optional.ofNullable(dentist));
     }
 
     private static String single(Map<String, String[]> parameters, String name, List<ApiError.Detail> details) {
