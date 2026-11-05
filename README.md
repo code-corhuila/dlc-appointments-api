@@ -84,8 +84,7 @@ Database and broker tests are skipped unless these are set:
 |---|---|
 | `TEST_DATABASE_URL`, `TEST_DATABASE_USER`, `TEST_DATABASE_PASSWORD` | A PostgreSQL 16 database migrated by `dlc-appointments-db`, as the runtime role |
 | `TEST_RABBITMQ_URL` | A disposable RabbitMQ (`amqp://user:password@host:5672`) |
-
-Every HTTP test response is also validated against the OpenAPI snapshot in `appointments-app/src/test/resources/contracts/openapi`. Refresh that snapshot from dlc-docs when a contract changes.
+| `DLC_DOCS_DIR` | Path of a dlc-docs checkout. Every HTTP test response is then validated against `07-api/contracts/openapi/appointments-service.yaml` or `internal-coordination.yaml`, read in place |
 
 ## Run with Docker Compose
 
