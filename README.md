@@ -93,16 +93,16 @@ Coverage (JaCoCo) is reported on every build: per module in `target/site/jacoco`
 Requirements:
 - the external network `platform`;
 - PostgreSQL from `dlc-infra-postgres`, with the schema applied by `dlc-appointments-db`;
-- a `.env` file at the repository root.
+- a `.env` file at the repository root. Pass it with `--env-file .env`: Compose otherwise looks for `.env` next to `deploy/compose.yml`, and `APPOINTMENTS_SECRETS_DIR` and the broker credentials are read from it.
 
 ```bash
-docker compose -f deploy/compose.yml up -d --build
+docker compose --env-file .env -f deploy/compose.yml up -d --build
 ```
 
 If the stage has no shared broker yet, add the `broker` profile. It starts `dlc-rabbitmq` on the same network:
 
 ```bash
-docker compose -f deploy/compose.yml --profile broker up -d --build
+docker compose --env-file .env -f deploy/compose.yml --profile broker up -d --build
 ```
 
 The image is multi-stage, runs as the non-root user `appointments` and listens on `SERVER_PORT`. The container healthcheck calls `GET /health`. `GET /health/ready` also checks the database.
