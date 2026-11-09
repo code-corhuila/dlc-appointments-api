@@ -19,6 +19,7 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthentica
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffAuthenticationVerifier;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.security.StaffJwtSignatureVerifier;
 import co.edu.corhuila.dlc.appointments.adapter.out.auth.AuthSessionValidationClient;
+import co.edu.corhuila.dlc.appointments.adapter.out.auth.IamServiceTokenSupplier;
 import co.edu.corhuila.dlc.appointments.adapter.out.authorization.RoleSchedulingAuthorization;
 import co.edu.corhuila.dlc.appointments.adapter.out.eligibility.HttpAppointmentEligibility;
 import co.edu.corhuila.dlc.appointments.adapter.in.messaging.EventEnvelopeReader;
@@ -54,7 +55,9 @@ import co.edu.corhuila.dlc.appointments.application.usecase.ReadAppointmentUseCa
 import co.edu.corhuila.dlc.appointments.application.usecase.ScheduleAppointmentUseCase;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.time.Clock;
+import java.util.function.Supplier;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
@@ -88,7 +91,7 @@ public class AppointmentsConfiguration {
                 RsaPublicKeys.fromConfiguration(security.jwtPublicKey(), security.jwtPublicKeyFile()),
                 security.jwtIssuer(), security.jwtAudience());
         var registration = new FilterRegistrationBean<>(new StaffAuthenticationFilter(
-                new StaffAuthenticationVerifier(jwt, authSessions(properties.auth()))));
+                new StaffAuthenticationVerifier(jwt, authSessions(properties))));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
     }
@@ -136,8 +139,10 @@ public class AppointmentsConfiguration {
         var auth = properties.auth();
         var patients = properties.patients();
         return new HttpAppointmentEligibility(ownerClient(auth.timeout()),
-                required(patients.internalUrl(), "PATIENTS_INTERNAL_URL"), patients::currentServiceToken,
-                auth.internalUrl(), auth::currentServiceToken);
+                required(patients.internalUrl(), "PATIENTS_INTERNAL_URL"),
+                serviceToken(properties, "patients-api", "patients:validate", patients::currentServiceToken),
+                auth.internalUrl(), serviceToken(properties, "auth-service", "identity:validate",
+                        auth::currentServiceToken));
     }
 
     @Bean
@@ -261,9 +266,20 @@ public class AppointmentsConfiguration {
         return new ListAppointmentsUseCase(appointments);
     }
 
-    private static AuthSessionValidationClient authSessions(AppointmentsProperties.Auth auth) {
+    private static AuthSessionValidationClient authSessions(AppointmentsProperties properties) {
+        var auth = properties.auth();
         return new AuthSessionValidationClient(ownerClient(auth.timeout()), auth.internalUrl(),
-                auth::currentServiceToken);
+                serviceToken(properties, "auth-service", "identity:validate", auth::currentServiceToken));
+    }
+
+    /** ADR-020: an IAM-issued token for the audience when a service client is configured, else the file. */
+    private static Supplier<String> serviceToken(AppointmentsProperties properties, String audience, String scope,
+            Supplier<String> file) {
+        var client = properties.serviceClient();
+        if (client == null || !client.issuesTokens()) return file;
+        return new IamServiceTokenSupplier(required(properties.auth().internalUrl(), "AUTH_INTERNAL_URL"),
+                client.id(), Path.of(client.secretFile()), audience, scope, properties.auth().timeout(),
+                Clock.systemUTC());
     }
 
     /** No redirects and explicit deadlines: an owner answers in time or the request fails closed with 503. */

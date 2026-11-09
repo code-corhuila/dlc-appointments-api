@@ -69,6 +69,10 @@ appointments:
   # Swagger UI at /docs over a dlc-docs checkout's 07-api/contracts/openapi folder; unset disables it (production).
   api-docs:
     contracts-dir: ${APPOINTMENTS_API_DOCS_DIR:}
+  # ADR-020: with a secret file, service tokens are issued by IAM (AUTH_INTERNAL_URL) instead of read from files.
+  service-client:
+    id: ${SERVICE_CLIENT_ID:appointments-api}
+    secret-file: ${SERVICE_CLIENT_SECRET_FILE:}
   patients:
     internal-url: ${PATIENTS_INTERNAL_URL:}
     service-token: ${PATIENTS_SERVICE_TOKEN:}
