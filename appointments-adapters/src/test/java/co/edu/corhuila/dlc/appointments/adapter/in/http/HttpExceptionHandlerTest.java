@@ -22,7 +22,7 @@ class HttpExceptionHandlerTest {
                 .andExpect(status().isBadRequest()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.details[0].field").value("reason"));
-        int[] statuses = {409, 409, 409, 503, 403, 409};
+        int[] statuses = {409, 409, 409, 503, 403, 409, 400};
         int index = 0;
         for (var reason : SchedulingException.Reason.values()) {
             mvc.perform(get("/probe/scheduling/{reason}", reason.name()))
