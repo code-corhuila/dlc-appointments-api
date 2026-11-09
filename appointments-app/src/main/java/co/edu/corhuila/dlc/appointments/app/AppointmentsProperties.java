@@ -10,7 +10,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /** Externalized configuration bound from the environment variables listed in .env.example. */
 @ConfigurationProperties(prefix = "appointments")
 public record AppointmentsProperties(String clinicTimezone, Security security, Internal internal, Auth auth,
-        Patients patients, Messaging messaging) {
+        Patients patients, Messaging messaging, ServiceClient serviceClient) {
+
+    /** ADR-020: with a secret file, outbound service tokens are issued by IAM (the Auth internal origin). */
+    public record ServiceClient(String id, String secretFile) {
+        public boolean issuesTokens() {
+            return secretFile != null && !secretFile.isBlank();
+        }
+    }
 
     /**
      * Broker URI with credentials (secret); outbox relay exchange and batch; consumed producer exchanges and the
