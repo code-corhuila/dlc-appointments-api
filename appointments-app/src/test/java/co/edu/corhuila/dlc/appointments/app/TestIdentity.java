@@ -175,6 +175,7 @@ final class TestIdentity {
                 respond(exchange, UNVERIFIABLE_PATIENT.equals(id) ? 503 : 200,
                         "{\"patientId\":\"" + id + "\",\"active\":" + !INACTIVE_PATIENT.equals(id) + ",\"version\":1}");
             });
+            server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
             server.start();
             return server;
         } catch (Exception failure) {
