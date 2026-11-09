@@ -42,12 +42,13 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
             jdbc.sql("""
                     INSERT INTO appointments.appointments (appointment_id, patient_id, dentist_id, start_at, end_at,
                         clinic_timezone, reason, status, confirmation_status, reminder_due_at, reminder_status,
-                        version, created_at, created_by, updated_at, updated_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+                        version, created_at, created_by, updated_at, updated_by, type_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
                     .params(a.id(), a.patientId(), a.dentistId(), utc(a.startAt()), utc(a.endAt()), clinicTimezone,
                             a.reason(), a.status().name(), a.confirmationStatus().name(),
                             utc(appointment.reminderDueAt()), a.reminderStatus().name(), a.version(),
-                            Timestamp.from(a.createdAt()), a.createdBy(), Timestamp.from(a.updatedAt()), a.updatedBy())
+                            Timestamp.from(a.createdAt()), a.createdBy(), Timestamp.from(a.updatedAt()), a.updatedBy(),
+                            a.typeCode())
                     .update();
         } catch (DataIntegrityViolationException violation) {
             if (sqlState(violation).equals(EXCLUSION_VIOLATION)) {
@@ -61,7 +62,7 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
     public Optional<Appointment> findById(UUID id) {
         return jdbc.sql("""
                 SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,
-                       reminder_status, version, created_at, created_by, updated_at, updated_by
+                       reminder_status, version, created_at, created_by, updated_at, updated_by, type_code
                 FROM appointments.appointments WHERE appointment_id = ?""")
                 .param(id)
                 .query((row, n) -> Appointment.reconstitute(snapshot(row)))
@@ -96,7 +97,7 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
         params.put("offset", (long) (criteria.page() - 1) * criteria.limit());
         var items = jdbc.sql("""
                 SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,
-                       reminder_status, version, created_at, created_by, updated_at, updated_by
+                       reminder_status, version, created_at, created_by, updated_at, updated_by, type_code
                 FROM appointments.appointments""" + where
                 + " ORDER BY created_at DESC, appointment_id DESC LIMIT :limit OFFSET :offset")
                 .params(params).query((row, n) -> Appointment.reconstitute(snapshot(row))).list();
@@ -107,7 +108,7 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
     public Optional<Appointment> findForUpdate(UUID id) {
         return jdbc.sql("""
                 SELECT appointment_id, patient_id, dentist_id, start_at, end_at, reason, status, confirmation_status,
-                       reminder_status, version, created_at, created_by, updated_at, updated_by
+                       reminder_status, version, created_at, created_by, updated_at, updated_by, type_code
                 FROM appointments.appointments WHERE appointment_id = ? FOR UPDATE""")
                 .param(id)
                 .query((row, n) -> Appointment.reconstitute(snapshot(row)))
@@ -145,7 +146,7 @@ public final class JdbcAppointmentRepository implements AppointmentReader, Appoi
                 ConfirmationStatus.valueOf(row.getString("confirmation_status")),
                 ReminderStatus.valueOf(row.getString("reminder_status")), row.getLong("version"),
                 instant(row, "created_at").toInstant(), row.getObject("created_by", UUID.class),
-                instant(row, "updated_at").toInstant(), row.getObject("updated_by", UUID.class));
+                instant(row, "updated_at").toInstant(), row.getObject("updated_by", UUID.class), row.getString("type_code"));
     }
 
     private static OffsetDateTime instant(ResultSet row, String column) throws SQLException {

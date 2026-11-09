@@ -28,6 +28,7 @@ public final class Appointment {
     private final UUID createdBy;
     private final Instant updatedAt;
     private final UUID updatedBy;
+    private final String typeCode;
 
     private Appointment(AppointmentSnapshot state) {
         this.id = state.id();
@@ -44,10 +45,18 @@ public final class Appointment {
         this.createdBy = state.createdBy();
         this.updatedAt = state.updatedAt();
         this.updatedBy = state.updatedBy();
+        this.typeCode = state.typeCode();
     }
 
     public static Appointment schedule(UUID id, UUID patientId, UUID dentistId, OffsetDateTime startAt,
                                        OffsetDateTime endAt, String reason, UUID actor, Instant now) {
+        return schedule(id, patientId, dentistId, startAt, endAt, reason, actor, now, null);
+    }
+
+    /** HU-APT-006: the type code is optional; its catalog membership is checked by the scheduling use case. */
+    public static Appointment schedule(UUID id, UUID patientId, UUID dentistId, OffsetDateTime startAt,
+                                       OffsetDateTime endAt, String reason, UUID actor, Instant now,
+                                       String typeCode) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(now, "now");
         require(id, "id");
@@ -67,7 +76,7 @@ public final class Appointment {
         }
         return new Appointment(new AppointmentSnapshot(id, patientId, dentistId, startAt, endAt, reason,
                 AppointmentStatus.PROGRAMADA, ConfirmationStatus.PENDING, ReminderStatus.PENDING, 1,
-                now, actor, now, actor));
+                now, actor, now, actor, typeCode));
     }
 
     /** Restores stored state; a row that breaks an invariant is corrupt, not a client error. */
@@ -185,7 +194,7 @@ public final class Appointment {
                             ReminderStatus reminder, OffsetDateTime nextStart, OffsetDateTime nextEnd, String reason,
                             boolean override, UUID actor, Instant now) {
         Appointment next = new Appointment(new AppointmentSnapshot(id, patientId, dentistId, nextStart, nextEnd,
-                this.reason, to, confirmation, reminder, version + 1, createdAt, createdBy, now, actor));
+                this.reason, to, confirmation, reminder, version + 1, createdAt, createdBy, now, actor, typeCode));
         boolean moved = operation == LifecycleOperation.RESCHEDULE;
         return new Transition(next, new StatusChange(operation, status, to, moved ? startAt : null,
                 moved ? endAt : null, moved ? nextStart : null, moved ? nextEnd : null, reason, override));
@@ -193,7 +202,7 @@ public final class Appointment {
 
     public AppointmentSnapshot snapshot() {
         return new AppointmentSnapshot(id, patientId, dentistId, startAt, endAt, reason, status,
-                confirmationStatus, reminderStatus, version, createdAt, createdBy, updatedAt, updatedBy);
+                confirmationStatus, reminderStatus, version, createdAt, createdBy, updatedAt, updatedBy, typeCode);
     }
 
     public UUID id() { return id; }
@@ -212,4 +221,6 @@ public final class Appointment {
     public UUID createdBy() { return createdBy; }
     public Instant updatedAt() { return updatedAt; }
     public UUID updatedBy() { return updatedBy; }
+    /** HU-APT-006 appointment type code, or null when none was chosen. */
+    public String typeCode() { return typeCode; }
 }

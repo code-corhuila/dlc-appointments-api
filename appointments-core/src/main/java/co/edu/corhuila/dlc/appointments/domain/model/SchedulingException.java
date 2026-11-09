@@ -4,7 +4,7 @@ package co.edu.corhuila.dlc.appointments.domain.model;
 public final class SchedulingException extends RuntimeException {
     public enum Reason {
         PATIENT_INELIGIBLE, DENTIST_INELIGIBLE, SLOT_UNAVAILABLE, DEPENDENCY_UNAVAILABLE,
-        AUTHORIZATION_DENIED, IDEMPOTENCY_CONFLICT
+        AUTHORIZATION_DENIED, IDEMPOTENCY_CONFLICT, TYPE_UNAVAILABLE
     }
 
     private final Reason reason;

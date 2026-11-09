@@ -1,5 +1,7 @@
 package co.edu.corhuila.dlc.appointments.application.usecase;
 
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentTypes;
+
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointment;
 import co.edu.corhuila.dlc.appointments.application.port.in.ScheduleAppointmentCommand;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentAvailability;
@@ -24,10 +26,18 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
     private final SchedulingAuthorization authorization;
     private final IdGenerator ids;
     private final Clock clock;
+    private final AppointmentTypes types;
 
     public ScheduleAppointmentUseCase(AppointmentEligibility eligibility,
             AppointmentAvailability availability, AppointmentRegistration registration,
             SchedulingAuthorization authorization, IdGenerator ids, Clock clock) {
+        this(eligibility, availability, registration, authorization, ids, clock, code -> false);
+    }
+
+    public ScheduleAppointmentUseCase(AppointmentEligibility eligibility,
+            AppointmentAvailability availability, AppointmentRegistration registration,
+            SchedulingAuthorization authorization, IdGenerator ids, Clock clock, AppointmentTypes types) {
+        this.types = Objects.requireNonNull(types, "types");
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
         this.availability = Objects.requireNonNull(availability, "availability");
         this.registration = Objects.requireNonNull(registration, "registration");
@@ -43,7 +53,8 @@ public final class ScheduleAppointmentUseCase implements ScheduleAppointment {
         Objects.requireNonNull(command, "command");
         Appointment proposed = Appointment.schedule(ids.newId(), command.patientId(),
                 command.dentistId(), command.startAt(), command.endAt(), command.reason(),
-                context.actorUserId(), clock.instant());
+                context.actorUserId(), clock.instant(), command.typeCode());
+        if (command.typeCode() != null) require(types.isActive(command.typeCode()), Reason.TYPE_UNAVAILABLE);
         var recovered = registration.recover(context, proposed);
         if (recovered.isPresent()) return recovered.get();
         return registration.register(context, proposed, () -> validateNewAppointment(proposed));
