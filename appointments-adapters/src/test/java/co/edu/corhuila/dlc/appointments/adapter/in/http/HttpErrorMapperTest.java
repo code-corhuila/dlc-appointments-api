@@ -39,7 +39,8 @@ class HttpErrorMapperTest {
                 "SLOT_UNAVAILABLE", Map.entry(409, "APPOINTMENT_CONFLICT"),
                 "DEPENDENCY_UNAVAILABLE", Map.entry(503, "SERVICE_UNAVAILABLE"),
                 "AUTHORIZATION_DENIED", Map.entry(403, "FORBIDDEN"),
-                "IDEMPOTENCY_CONFLICT", Map.entry(409, "IDEMPOTENCY_CONFLICT"));
+                "IDEMPOTENCY_CONFLICT", Map.entry(409, "IDEMPOTENCY_CONFLICT"),
+                "TYPE_UNAVAILABLE", Map.entry(400, "VALIDATION_ERROR"));
         assertEquals(expected.size(), SchedulingException.Reason.values().length);
         for (var reason : SchedulingException.Reason.values()) {
             var response = HttpErrorMapper.map(new SchedulingException(reason), "trusted-trace");

@@ -3,6 +3,8 @@ package co.edu.corhuila.dlc.appointments.app;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.CorrelationFilter;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentTypes;
+import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentTypes;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcEventInbox;
@@ -167,10 +169,16 @@ public class AppointmentsConfiguration {
     @Bean
     ScheduleAppointment scheduleAppointment(AppointmentEligibility eligibility, JdbcClient jdbc,
             TransactionTemplate transactions, JdbcAppointmentRepository appointments, JdbcIdempotencyStore keys,
-            JdbcOutboxWriter outbox) {
+            JdbcOutboxWriter outbox, AppointmentTypes appointmentTypes) {
         return new ScheduleAppointmentUseCase(eligibility, new JdbcAppointmentAvailability(jdbc),
                 new JdbcAppointmentRegistration(transactions, jdbc, appointments, keys, outbox, UUID::randomUUID),
-                new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC());
+                new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC(), appointmentTypes);
+    }
+
+    /** HU-APT-006: migration-owned appointment-type catalog. */
+    @Bean
+    AppointmentTypes appointmentTypes(JdbcClient jdbc) {
+        return new JdbcAppointmentTypes(jdbc);
     }
 
     /** HU-APT-002: staff-only lifecycle changes, each one atomic in PostgreSQL. */

@@ -70,6 +70,8 @@ public final class HttpErrorMapper {
                     response(503, "SERVICE_UNAVAILABLE", "The operation is temporarily unavailable.", null, trustedTraceId);
                 case AUTHORIZATION_DENIED ->
                     response(403, "FORBIDDEN", "The operation is not permitted.", null, trustedTraceId);
+                case TYPE_UNAVAILABLE -> response(400, "VALIDATION_ERROR", "The request is invalid.",
+                    List.of(new ApiError.Detail("typeCode", "Unknown or inactive appointment type.")), trustedTraceId);
             };
         }
         return response(500, "INTERNAL_ERROR", "An unexpected error occurred.", null, trustedTraceId);

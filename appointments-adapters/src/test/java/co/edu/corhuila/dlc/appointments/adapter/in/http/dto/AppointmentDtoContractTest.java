@@ -124,6 +124,17 @@ class AppointmentDtoContractTest {
         tree.elements().forEachRemaining(value -> assertFalse(value.isNull()));
     }
 
+    @Test
+    void responseCarriesTheAppointmentTypeOnlyWhenOneWasChosen() throws Exception {
+        var typed = Appointment.schedule(ID, PATIENT, DENTIST, START, END, "Checkup", ACTOR, NOW, "LIMPIEZA");
+        JsonNode tree = json.readTree(json.writeValueAsString(AppointmentResponse.from(typed)));
+        assertEquals("LIMPIEZA", tree.get("typeCode").textValue());
+        var request = json.readValue("{\"patientId\":\"" + PATIENT + "\",\"dentistId\":\"" + DENTIST
+                + "\",\"startAt\":\"2026-11-01T09:00:00-05:00\",\"endAt\":\"2026-11-01T09:30:00-05:00\","
+                + "\"reason\":\"Checkup\",\"typeCode\":\"LIMPIEZA\"}", CreateAppointmentRequest.class);
+        assertEquals("LIMPIEZA", request.toCommand().typeCode());
+    }
+
     private Appointment appointment(ScheduleAppointmentCommand command) {
         return Appointment.schedule(ID, command.patientId(), command.dentistId(),
                 command.startAt(), command.endAt(), command.reason(), ACTOR, NOW);
