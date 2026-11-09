@@ -10,6 +10,7 @@ import co.edu.corhuila.dlc.appointments.domain.model.InvalidStatusTransitionExce
 import co.edu.corhuila.dlc.appointments.domain.model.PatientGuardNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.ReminderOutcomeConflictException;
 import co.edu.corhuila.dlc.appointments.domain.model.StaleVersionException;
+import co.edu.corhuila.dlc.appointments.domain.model.WaitingListEntryNotFoundException;
 import co.edu.corhuila.dlc.appointments.domain.model.InvalidAppointmentException;
 import co.edu.corhuila.dlc.appointments.domain.model.SchedulingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -29,7 +30,8 @@ public final class HttpErrorMapper {
         }
         if (failure instanceof AppointmentNotFoundException || failure instanceof DentistNotFoundException
                 || failure instanceof ClinicalAssignmentNotFoundException
-                || failure instanceof PatientGuardNotFoundException) {
+                || failure instanceof PatientGuardNotFoundException
+                || failure instanceof WaitingListEntryNotFoundException) {
             return response(404, "NOT_FOUND", "The resource does not exist.", null, trustedTraceId);
         }
         if (failure instanceof InvalidAvailabilityException invalid) {

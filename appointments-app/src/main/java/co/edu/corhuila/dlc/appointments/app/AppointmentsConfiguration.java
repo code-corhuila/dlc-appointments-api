@@ -4,6 +4,8 @@ import co.edu.corhuila.dlc.appointments.adapter.in.http.CorrelationFilter;
 import co.edu.corhuila.dlc.appointments.adapter.in.http.ReadinessProbe;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentRepository;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcAppointmentTypes;
+import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcWaitingListStore;
+import co.edu.corhuila.dlc.appointments.application.usecase.WaitingListUseCase;
 import co.edu.corhuila.dlc.appointments.application.port.out.AppointmentTypes;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcIdempotencyStore;
 import co.edu.corhuila.dlc.appointments.adapter.out.persistence.JdbcOutboxWriter;
@@ -173,6 +175,14 @@ public class AppointmentsConfiguration {
         return new ScheduleAppointmentUseCase(eligibility, new JdbcAppointmentAvailability(jdbc),
                 new JdbcAppointmentRegistration(transactions, jdbc, appointments, keys, outbox, UUID::randomUUID),
                 new RoleSchedulingAuthorization(), UUID::randomUUID, Clock.systemUTC(), appointmentTypes);
+    }
+
+    /** HU-APT-005: waiting list, written with its Idempotency-Key in one transaction. */
+    @Bean
+    WaitingListUseCase waitingListUseCase(TransactionTemplate transactions, JdbcClient jdbc,
+            JdbcIdempotencyStore keys, AppointmentEligibility eligibility) {
+        return new WaitingListUseCase(new JdbcWaitingListStore(transactions, jdbc, keys), eligibility,
+                UUID::randomUUID, Clock.systemUTC());
     }
 
     /** HU-APT-006: migration-owned appointment-type catalog. */
