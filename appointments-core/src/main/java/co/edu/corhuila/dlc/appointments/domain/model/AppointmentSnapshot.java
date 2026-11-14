@@ -8,4 +8,13 @@ import java.util.UUID;
 public record AppointmentSnapshot(UUID id, UUID patientId, UUID dentistId, OffsetDateTime startAt,
         OffsetDateTime endAt, String reason, AppointmentStatus status, ConfirmationStatus confirmationStatus,
         ReminderStatus reminderStatus, long version, Instant createdAt, UUID createdBy, Instant updatedAt,
-        UUID updatedBy) { }
+        UUID updatedBy, String typeCode) {
+    /** State without an appointment type (HU-APT-006 is optional). */
+    public AppointmentSnapshot(UUID id, UUID patientId, UUID dentistId, OffsetDateTime startAt, OffsetDateTime endAt,
+            String reason, AppointmentStatus status, ConfirmationStatus confirmationStatus,
+            ReminderStatus reminderStatus, long version, Instant createdAt, UUID createdBy, Instant updatedAt,
+            UUID updatedBy) {
+        this(id, patientId, dentistId, startAt, endAt, reason, status, confirmationStatus, reminderStatus, version,
+                createdAt, createdBy, updatedAt, updatedBy, null);
+    }
+}
