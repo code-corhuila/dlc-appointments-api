@@ -1,0 +1,84 @@
+spring:
+  application:
+    name: dlc-appointments-api
+  lifecycle:
+    # Norma 5.3.10: graceful shutdown limit.
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    # Own schema only, as appointments_runtime; the API never runs migrations.
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # Norma 5.3.10: pool size, connection wait and per-statement limit.
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      connection-init-sql: "SET statement_timeout = '5s'"
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  web:
+    resources:
+      add-mappings: false
+
+# Norma 5.3.10: explicit server limits; an undeclared default is not a decision.
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  tomcat:
+    # Header read / socket wait.
+    connection-timeout: 5s
+    # Idle keep-alive connection.
+    keep-alive-timeout: 60s
+
+appointments:
+  # Single clinic (HU-APT-001): instants are stored in UTC and interpreted in this zone.
+  clinic-timezone: America/Bogota
+  security:
+    jwt-public-key: ${JWT_PUBLIC_KEY:}
+    jwt-public-key-file: ${JWT_PUBLIC_KEY_FILE:}
+    jwt-issuer: ${JWT_ISSUER:}
+    jwt-audience: ${JWT_AUDIENCE:}
+  # APT-006 informational reminders: bounded passes at a fixed delay.
+  reminders:
+    enabled: ${APPOINTMENTS_REMINDERS_ENABLED:true}
+    interval: ${APPOINTMENTS_REMINDERS_INTERVAL:PT30S}
+    batch-size: ${APPOINTMENTS_REMINDERS_BATCH_SIZE:100}
+  messaging:
+    relay-enabled: ${APPOINTMENTS_RELAY_ENABLED:true}
+    relay-interval: ${APPOINTMENTS_RELAY_INTERVAL:PT2S}
+    relay-batch-size: ${APPOINTMENTS_RELAY_BATCH_SIZE:100}
+    rabbitmq-uri: ${APPOINTMENTS_RABBITMQ_URI:}
+    exchange: ${APPOINTMENTS_EVENTS_EXCHANGE:appointments.events}
+    # Consumers of ClinicalCareCompleted and PatientDeactivated (inbox, bounded retry, DLQ).
+    consumers-enabled: ${APPOINTMENTS_CONSUMERS_ENABLED:true}
+    clinical-exchange: ${APPOINTMENTS_CLINICAL_EVENTS_EXCHANGE:clinical.events}
+    patients-exchange: ${APPOINTMENTS_PATIENTS_EVENTS_EXCHANGE:patients.events}
+    consumer-attempts: ${APPOINTMENTS_CONSUMER_ATTEMPTS:5}
+    consumer-backoff: ${APPOINTMENTS_CONSUMER_BACKOFF:PT1S}
+  internal:
+    jwt-public-key: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY:}
+    jwt-public-key-file: ${INTERNAL_SERVICE_JWT_PUBLIC_KEY_FILE:}
+    jwt-issuer: ${INTERNAL_SERVICE_JWT_ISSUER:}
+    jwt-audience: ${INTERNAL_SERVICE_JWT_AUDIENCE:}
+  auth:
+    internal-url: ${AUTH_INTERNAL_URL:}
+    service-token: ${AUTH_SERVICE_TOKEN:}
+    service-token-file: ${AUTH_SERVICE_TOKEN_FILE:}
+    timeout: 2s
+  # Swagger UI at /docs over a dlc-docs checkout's 07-api/contracts/openapi folder; unset disables it (production).
+  api-docs:
+    contracts-dir: ${APPOINTMENTS_API_DOCS_DIR:}
+  # ADR-020: with a secret file, service tokens are issued by IAM (AUTH_INTERNAL_URL) instead of read from files.
+  service-client:
+    id: ${SERVICE_CLIENT_ID:appointments-api}
+    secret-file: ${SERVICE_CLIENT_SECRET_FILE:}
+  patients:
+    internal-url: ${PATIENTS_INTERNAL_URL:}
+    service-token: ${PATIENTS_SERVICE_TOKEN:}
+    service-token-file: ${PATIENTS_SERVICE_TOKEN_FILE:}
+
+logging:
+  structured:
+    format:
+      console: logstash

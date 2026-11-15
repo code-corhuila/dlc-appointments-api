@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>co.edu.corhuila.dlc</groupId>
+        <artifactId>dlc-appointments-api</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>appointments-app</artifactId>
+
+    <name>appointments-app</name>
+
+    <properties>
+        <coverage.line.minimum>0.66</coverage.line.minimum>
+        <coverage.branch.minimum>0.25</coverage.branch.minimum>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>co.edu.corhuila.dlc</groupId>
+            <artifactId>appointments-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>co.edu.corhuila.dlc</groupId>
+            <artifactId>appointments-adapters</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Swagger UI assets for /docs (served locally, never from a CDN); enabled only with APPOINTMENTS_API_DOCS_DIR. -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>swagger-ui</artifactId>
+            <version>5.34.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>webjars-locator-lite</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Contract tests: every HTTP test response is validated against the dlc-docs OpenAPI snapshot. -->
+        <dependency>
+            <groupId>com.atlassian.oai</groupId>
+            <artifactId>swagger-request-validator-mockmvc</artifactId>
+            <version>2.44.1</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+   <build>
+    <plugins>
+        <!-- Aggregate coverage of core, adapters and app, counting every module's tests:
+             target/site/jacoco-aggregate. -->
+        <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <id>report-aggregate</id>
+                    <phase>verify</phase>
+                    <goals>
+                        <goal>report-aggregate</goal>
+                    </goals>
+                    <configuration>
+                        <includeCurrentProject>true</includeCurrentProject>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <version>${spring-boot.version}</version>
+
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+
+</project>
